@@ -8,17 +8,19 @@
 #include <string.h>
 #include <math.h>
 
-// define it up here so other functions can access it
-struct arguments
+// define it up here so util functions can access it
+struct arguments_struct
 {
     char *input_file;
     char *out_file;
     bool verbose;
 } args;
-typedef struct arguments arguments;
+typedef struct arguments_struct arguments;
 
 // utils
 #define streq(a, b) (strcmp(a, b) == 0)
+#define strcontains(a, b, idx) (strstr(a + idx, b) != NULL)
+#define str_startswith(a, b) ((strncmp(a, b, strlen(b))) == 0)
 
 int logv(const char *format, ...)
 {
@@ -109,7 +111,7 @@ char *inline_scripts_in_html(long len, char *source, arguments args)
     char *ret = malloc(len * sizeof(char));
     strcpy(ret, source);
 
-    int *token_indexes = malloc(1 * sizeof(int)), index_count = 0, cursor = 0;
+    int *token_indexes = NULL, index_count = 0, cursor = 0;
 
     char c_val, skip_until = '\0';
 
@@ -128,34 +130,27 @@ char *inline_scripts_in_html(long len, char *source, arguments args)
             skip_until = '\0';
         }
 
-        logv("Comparing %d with %d...\n", skip_until, '\0');
         if (skip_until != '\0')
         {
-            logv("...they are not equal.\n");
             logv("skipping...\n");
             goto cont;
         }
 
-        logv("Comparing %c with %c...\n", c_val, '<');
         if (c_val == '<')
         {
-            logv("\t...they are equal.\n");
 
-            logv("Comparing %c with %c...\n", source[cursor + 1], '!');
             if (source[cursor + 1] == '!') // doctype declaration or comment
             {
-                logv("\t...they are equal.\n");
                 skip_until = '>';
                 goto cont;
             }
-            else
-                logv("\t...they are not equal.\n");
 
-            token_indexes = malloc(++index_count * sizeof(token_indexes));
+            if (!token_indexes)
+                token_indexes = malloc(++index_count * sizeof(int));
+            else
+                token_indexes = realloc(token_indexes, ++index_count * sizeof(token_indexes[0]));
             token_indexes[index_count - 1] = cursor;
         }
-        else
-            logv("\t...they are not equal.\n");
 
     cont:
         cursor++;
@@ -163,21 +158,43 @@ char *inline_scripts_in_html(long len, char *source, arguments args)
 
     logv("index_count = %d\n", index_count);
 
-    for (int i = 0; i < index_count; i++)
+    for (int i = 0; i < index_count - 1; i++)
     {
         logv("Token %d: \n", i);
         cursor = token_indexes[i];
         logv("Cursor: %d\n", cursor);
         logv("next token index: %d\n", token_indexes[i + 1]);
-        while (cursor < token_indexes[i + 1])
+
+        // token_indexes[i] is the location where the current token starts
+        //  (the previous do-while loop modified the `cursor` variable)
+
+        // this should ignore all script tags
+        if (str_startswith(source + token_indexes[i], "<script"))
         {
-            printf("%c", source[cursor++]);
+            logv("encountered script tag\n");
+            continue;
         }
-        puts("\n");
+        else if (str_startswith(source + token_indexes[i], "</script>"))
+        {
+            logv("encountered end script tag\n");
+            continue;
+        }
+
+        do
+        {
+            c_val = source[cursor++];
+            printf("%c", c_val);
+        } while (cursor < token_indexes[i + 1]);
+        printf("\n");
+
+        puts("\n"); // \n\n
+
+        continue; // don't let normally executing code see the i++ below o_o
+    skip_next_token:
+        i++;
     }
 
     return ret;
-    // get lines
 }
 
 int main(int argc, char *cmdargs[])

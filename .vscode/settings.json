@@ -15,6 +15,9 @@
         "ostream": "c",
         "stdexcept": "c",
         "streambuf": "c",
-        "functional": "c"
+        "functional": "c",
+        "stdlib.h": "c",
+        "stdio.h": "c",
+        "stdarg.h": "c"
     }
 }
