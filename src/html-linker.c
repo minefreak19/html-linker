@@ -156,9 +156,14 @@ char *inline_scripts_in_html(long len, char *source, arguments args)
         cursor++;
     } while (c_val != '\0');
 
+    // add the string length as a token index
+    //  so it stops reading tokens when it gets to the end
+    token_indexes = realloc(token_indexes, (index_count + 1) * sizeof(token_indexes[0]));
+    token_indexes[index_count] = len;
+
     logv("index_count = %d\n", index_count);
 
-    for (int i = 0; i < index_count - 1; i++)
+    for (int i = 0; i < index_count; i++)
     {
         logv("Token %d: \n", i);
         cursor = token_indexes[i];
