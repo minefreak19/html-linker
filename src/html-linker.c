@@ -106,7 +106,7 @@ arguments parse_args(int argc, char *args[])
     return res;
 }
 
-char *inline_scripts_in_html(long len, char *source, arguments args)
+char *inline_scripts_in_html(long len, char *source)
 {
     char *ret = malloc(len * sizeof(char));
     strcpy(ret, source);
@@ -171,9 +171,9 @@ char *inline_scripts_in_html(long len, char *source, arguments args)
         logv("next token index: %d\n", token_indexes[i + 1]);
 
         // token_indexes[i] is the location where the current token starts
-        //  (the previous do-while loop modified the `cursor` variable)
+        //  useful if we ever move code around, as `cursor` is modified
 
-        // this should ignore all script tags
+        // this should select all script tags
         if (str_startswith(source + token_indexes[i], "<script"))
         {
             logv("encountered script tag\n");
@@ -183,6 +183,13 @@ char *inline_scripts_in_html(long len, char *source, arguments args)
         {
             logv("encountered end script tag\n");
             continue;
+        }
+
+        // stylesheets?
+        if (str_startswith(source + token_indexes[i], "<link"))
+        {
+            logv("link tag detected\n");
+            char *word = strtok(source + token_indexes[i], " ");
         }
 
         do
@@ -243,7 +250,7 @@ int main(int argc, char *cmdargs[])
 
     logv("calling inline_scripts_in_html...\n");
 
-    char *to_write = inline_scripts_in_html(bytes_input, to_parse, args);
+    char *to_write = inline_scripts_in_html(bytes_input, to_parse);
 
     // write to output file
     logv("opening output file in write mode...\n");
