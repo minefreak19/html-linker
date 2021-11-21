@@ -2,20 +2,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdarg.h>
-
-#define _GNU_SOURCE 1
-
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 
 // define it up here so util functions can access it
-struct arguments_struct
+typedef struct arguments arguments;
+struct arguments
 {
     char *input_file;
     char *out_file;
     bool verbose;
-} args;
-typedef struct arguments_struct arguments;
+};
+
+arguments args;
 
 // utils
 #define streq(a, b) (strcmp(a, b) == 0)
@@ -51,10 +51,6 @@ bool str_arr_contains(char *str, int arrlen, char *arr[])
 
     return true;
 }
-
-#define MODE_READ "r"
-#define MODE_WRITE "w"
-
 #define VERBOSE_DEFAULT false
 
 void print_args(arguments *args)
@@ -91,7 +87,6 @@ arguments parse_args(int argc, char *args[])
             res.out_file = args[++i];
             continue;
         }
-
         // check for flags
         if (streq(arg, "-v") || streq(arg, "--verbose"))
         {
@@ -106,11 +101,52 @@ arguments parse_args(int argc, char *args[])
     return res;
 }
 
+#define MODE_READ "r"
+#define MODE_WRITE "w"
+
+// buffer to be used for string concatenation, etc
+//  simpler than dealing with malloc() and free() for this use case
+
+// definitely aren't going to be writing 8KB of html anytime soon
+#define TMP_BUFFER_CAP (8192)
+char tmp_buf[TMP_BUFFER_CAP];
+size_t tmp_buf_sz;
+
+char *tmp_end(void)
+{
+    return tmp_buf + tmp_buf_sz;
+}
+
+char *tmp_alloc(size_t size)
+{
+    assert(size + tmp_buf_sz < TMP_BUFFER_CAP);
+    char *result = tmp_end();
+    tmp_buf_sz += size;
+    return result;
+}
+
+char *tmp_append_char(char c)
+{
+    *(tmp_alloc(1)) = c;
+}
+
+char *tmp_append_str(const char *str, size_t len)
+{
+    char *append = tmp_alloc(len);
+    memcpy(append, str, len);
+    return append;
+}
+
+char *tmp_append_cstr(const char *cstr)
+{
+    return tmp_append_str(cstr, strlen(cstr));
+}
+
+void tmp_clean(void) { tmp_buf_sz = 0; }
+
 char *inline_scripts_in_html(long len, char *source)
 {
-    char *ret = malloc(len * sizeof(char));
-    strcpy(ret, source);
-
+    char *ret;
     int *token_indexes = NULL, index_count = 0, cursor = 0;
 
     char c_val, skip_until = '\0';
@@ -163,10 +199,14 @@ char *inline_scripts_in_html(long len, char *source)
 
     logv("index_count = %d\n", index_count);
 
+    // should the current token be appended to the final file?
+    bool append = true;
     for (int i = 0; i < index_count; i++)
     {
         logv("Token %d: \n", i);
         cursor = token_indexes[i];
+        char *token = source + cursor;
+        unsigned int tok_len = token_indexes[i + 1] - cursor;
         logv("Cursor: %d\n", cursor);
         logv("next token index: %d\n", token_indexes[i + 1]);
 
@@ -174,40 +214,59 @@ char *inline_scripts_in_html(long len, char *source)
         //  useful if we ever move code around, as `cursor` is modified
 
         // this should select all script tags
-        if (str_startswith(source + token_indexes[i], "<script"))
+        if (str_startswith(token, "<script"))
         {
+            append = false;
             logv("encountered script tag\n");
-            continue;
         }
-        else if (str_startswith(source + token_indexes[i], "</script>"))
+        else if (str_startswith(token, "</script"))
         {
+            append = false;
             logv("encountered end script tag\n");
-            continue;
         }
 
         // stylesheets?
-        if (str_startswith(source + token_indexes[i], "<link"))
+        if (str_startswith(token, "<link"))
         {
             logv("link tag detected\n");
-            char *word = strtok(source + token_indexes[i], " ");
+            append = false;
+        }
+        else if (str_startswith(token, "</link"))
+        {
+            logv("end link tag detected\n");
+            append = false;
         }
 
-        do
+        if (append)
         {
-            c_val = source[cursor++];
-            printf("%c", c_val);
-        } while (cursor < token_indexes[i + 1]);
-        printf("\n");
+            tmp_append_str(token, tok_len);
+        }
+        else
+        {
+            append = true; // set it back to true for the next token
+        }
 
-        puts("\n"); // \n\n
+        if (args.verbose)
+        {
+            do
+            {
+                c_val = source[cursor++];
+                printf("%c", c_val);
+            } while (cursor < token_indexes[i + 1]);
+            printf("\n");
+
+            puts("\n"); // \n\n
+        }
     }
+
+    ret = malloc(tmp_buf_sz);
+    memcpy(ret, tmp_buf, tmp_buf_sz);
 
     return ret;
 }
 
 int main(int argc, char *cmdargs[])
 {
-    puts("parsing command-line arguments..."); // TODO remove
     args = parse_args(argc, cmdargs);
     FILE *input_file, *output_file;
     char *contents;
@@ -216,8 +275,8 @@ int main(int argc, char *cmdargs[])
     if (args.verbose)
         puts("Verbose mode ENABLED");
 
-    // if (args.verbose)
-    print_args(&args);
+    if (args.verbose)
+        print_args(&args);
 
     // read input file
     logv("Opening input file...\n");
@@ -257,8 +316,6 @@ int main(int argc, char *cmdargs[])
     output_file = fopen(args.out_file, MODE_WRITE);
 
     fseek(output_file, 0l, SEEK_SET);
-
-    logv("Writing %d bytes to %s\n", bytes_input, args.out_file);
     fprintf(output_file, "%s\n", to_write);
 
     printf("Successfully wrote %d bytes to %s\n", ftell(output_file), args.out_file);
