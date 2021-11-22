@@ -21,6 +21,7 @@ arguments args;
 #define streq(a, b) (strcmp(a, b) == 0)
 #define strcontains(a, b, idx) (strstr(a + idx, b) != NULL)
 #define str_startswith(a, b) ((strncmp(a, b, strlen(b))) == 0)
+#define str_endswith(a, b) ((strncmp(a + (strlen(a) - strlen(b)), b, strlen(b))) == 0)
 
 int logv(const char *format, ...)
 {
@@ -104,6 +105,28 @@ arguments parse_args(int argc, char *args[])
 #define MODE_READ "r"
 #define MODE_WRITE "w"
 
+char *read_file(const char *path)
+{
+    FILE *file = fopen(path, MODE_READ);
+    char *result;
+
+    // go to the end, and then find out where the cursor is
+    fseek(file, 0l, SEEK_END);
+    long len = ftell(file);
+
+    // go back to file start
+    fseek(file, 0l, SEEK_SET);
+
+    // leave space for ze null byte
+    result = calloc(len, sizeof(char));
+
+    // actually read the file
+    fread(result, sizeof(char), len, file);
+
+    fclose(file);
+    return result;
+}
+
 // buffer to be used for string concatenation, etc
 //  simpler than dealing with malloc() and free() for this use case
 
@@ -143,6 +166,47 @@ char *tmp_append_cstr(const char *cstr)
 }
 
 void tmp_clean(void) { tmp_buf_sz = 0; }
+
+void tmp_rewind(const char *end)
+{
+    tmp_buf_sz = end - tmp_buf;
+}
+
+void tmpcpy(char *to)
+{
+    memcpy(to, tmp_buf, tmp_buf_sz);
+}
+
+char *refactor_relative_path(const char *path, const char *relative_to)
+{
+    char *rewind = tmp_end();
+
+    char *ret;
+
+    char *last_slash = strrchr(relative_to, '\\');
+    if (!last_slash)
+    {
+        last_slash = strrchr(relative_to, '/');
+        if (!last_slash)
+        {
+            error("no file separators found in argument relative_to");
+        }
+    }
+
+    // we need the char after the slash
+    last_slash++;
+
+    tmp_append_str(relative_to, last_slash - relative_to);
+    tmp_append_cstr(path);
+    tmp_append_char(0); // terminate string
+
+    ret = malloc(tmp_end() - rewind);
+    memcpy(ret, tmp_buf, tmp_end() - rewind);
+
+    tmp_rewind(rewind);
+
+    return ret;
+}
 
 char *inline_scripts_in_html(long len, char *source)
 {
@@ -199,8 +263,17 @@ char *inline_scripts_in_html(long len, char *source)
 
     logv("index_count = %d\n", index_count);
 
+    const char word_delim[2] = " ";
+
+    size_t after_body_len = 0;
+    char **after_body = (char **)malloc(after_body_len * sizeof(after_body[0]));
+
     // should the current token be appended to the final file?
-    bool append = true;
+    char *append = NULL;
+    size_t append_len = 0;
+
+    // definitely terrible practice but
+    bool prev_script_src = false, prev_style_src = false;
     for (int i = 0; i < index_count; i++)
     {
         logv("Token %d: \n", i);
@@ -216,35 +289,96 @@ char *inline_scripts_in_html(long len, char *source)
         // this should select all script tags
         if (str_startswith(token, "<script"))
         {
-            append = false;
-            logv("encountered script tag\n");
+            logv("detected script tag\n");
+            bool ext_src = false;
+            bool defer = false;
+
+            if (!(str_startswith(token, "<script>"))) // if there are attributes, parse them
+            {
+                char *script_src_path;
+
+                // to duplicate string
+                char *script_tag = malloc(tok_len * sizeof(char));
+                memcpy(script_tag, token, tok_len);
+
+                char *word = strtok(script_tag, word_delim);
+                while (word)
+                {
+                    logv("currently looking at word: %s\n", word);
+                    if (str_startswith(word, "src="))
+                    {
+                        sscanf(word, "src=\"%s\"", &script_src_path);
+                        logv("this word starts with \"src=\"\n");
+                        logv("the source path for this script is %s\n", script_src_path);
+                        ext_src = true;
+                    }
+                    if (str_startswith(word, "defer"))
+                    {
+                        logv("this word starts with \"defer\"\n");
+                        defer = true;
+                    }
+                    word = strtok(NULL, word_delim);
+                }
+                prev_script_src = ext_src;
+
+                if (ext_src)
+                {
+                }
+            }
+            else
+            {
+                prev_script_src = false; // if no attributes, it's not a source script
+            }
+            logv("this script tag %s an external source\n", ext_src ? "is" : "is not");
+            if (defer)
+                logv("this tag is deferred\n");
+            if (ext_src)
+            {
+                append = "";
+                append_len = 0;
+                // TODO: read file, edit append, check for defer
+            }
+            else
+            {
+                append = NULL; // continue as-is
+            }
         }
         else if (str_startswith(token, "</script"))
         {
-            append = false;
             logv("encountered end script tag\n");
+
+            // exclude this if it ends a script tag with external src
+            if (prev_script_src)
+            {
+                append = "";
+                append_len = 0;
+            }
+            else
+            {
+                append = NULL;
+            }
         }
 
         // stylesheets?
         if (str_startswith(token, "<link"))
         {
             logv("link tag detected\n");
-            append = false;
-        }
-        else if (str_startswith(token, "</link"))
-        {
-            logv("end link tag detected\n");
-            append = false;
+            append = "";
+            append_len = 0;
         }
 
         if (append)
         {
-            tmp_append_str(token, tok_len);
         }
         else
         {
-            append = true; // set it back to true for the next token
+            append = token;
+            append_len = tok_len;
         }
+        tmp_append_str(append, append_len);
+
+        // set it back to NULL so we don't keep concatenating the same string
+        append = NULL;
 
         if (args.verbose)
         {
@@ -290,7 +424,7 @@ int main(int argc, char *cmdargs[])
 
     fseek(input_file, 0l, SEEK_SET); // go to beginning of input_file
 
-    contents = (char *)calloc(bytes_input, sizeof(char));
+    contents = calloc(bytes_input, sizeof(char));
     logv("Allocated ptr 0x%p to contents\n", contents);
 
     if (contents == NULL)
@@ -316,7 +450,12 @@ int main(int argc, char *cmdargs[])
     output_file = fopen(args.out_file, MODE_WRITE);
 
     fseek(output_file, 0l, SEEK_SET);
-    fprintf(output_file, "%s\n", to_write);
+
+    // add a trailing newline if there isn't one already
+    if (!(str_endswith(to_write, "\n")))
+        fprintf(output_file, "%s\n", to_write);
+    else
+        fprintf(output_file, "%s", to_write);
 
     printf("Successfully wrote %d bytes to %s\n", ftell(output_file), args.out_file);
 

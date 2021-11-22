@@ -1,7 +1,7 @@
 @echo off
 cd ./src
 @echo on
-gcc -std=gnu99 -o ../bin/run.exe *.c
+gcc -std=c11 -pedantic -o ../bin/run.exe *.c
 @echo off
 cd ..
 pause
