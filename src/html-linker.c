@@ -107,6 +107,7 @@ arguments parse_args(int argc, char *args[])
 
 char *read_file(const char *path)
 {
+    logv("opening file %s\n", path);
     FILE *file = fopen(path, MODE_READ);
     char *result;
 
@@ -118,12 +119,14 @@ char *read_file(const char *path)
     fseek(file, 0l, SEEK_SET);
 
     // leave space for ze null byte
-    result = calloc(len, sizeof(char));
+    result = calloc(len + 1, sizeof(char));
 
     // actually read the file
     fread(result, sizeof(char), len, file);
 
     fclose(file);
+
+    logv("read: \n%s\n", result);
     return result;
 }
 
@@ -180,6 +183,7 @@ void tmpcpy(char *to)
 char *refactor_relative_path(const char *path, const char *relative_to)
 {
     char *rewind = tmp_end();
+    size_t original_size = tmp_buf_sz;
 
     char *ret;
 
@@ -201,15 +205,19 @@ char *refactor_relative_path(const char *path, const char *relative_to)
     tmp_append_char(0); // terminate string
 
     ret = malloc(tmp_end() - rewind);
-    memcpy(ret, tmp_buf, tmp_end() - rewind);
+    memcpy(ret, tmp_buf + original_size, tmp_end() - rewind);
 
     tmp_rewind(rewind);
 
+    logv("refactored relative path: %s\n", ret);
     return ret;
 }
 
 char *inline_scripts_in_html(long len, char *source)
 {
+    char *rewind = tmp_end();
+    size_t original_sz = tmp_buf_sz;
+
     char *ret;
     int *token_indexes = NULL, index_count = 0, cursor = 0;
 
@@ -218,21 +226,13 @@ char *inline_scripts_in_html(long len, char *source)
     do
     {
         c_val = source[cursor];
-        logv("c_val = %c\n", c_val);
-        logv("next character = %c\n", source[cursor + 1]);
-        logv("cursor = %d\n", cursor);
-        logv("currently skipping until: %d\n", skip_until);
-
-        logv("Comparing %c with %c...\n", c_val, skip_until);
         if (c_val == skip_until)
         {
-            logv("\t...they are equal.\n");
             skip_until = '\0';
         }
 
         if (skip_until != '\0')
         {
-            logv("skipping...\n");
             goto cont;
         }
 
@@ -263,7 +263,7 @@ char *inline_scripts_in_html(long len, char *source)
 
     logv("index_count = %d\n", index_count);
 
-    const char word_delim[2] = " ";
+    const char word_delim[] = "> ";
 
     size_t after_body_len = 0;
     char **after_body = (char **)malloc(after_body_len * sizeof(after_body[0]));
@@ -300,6 +300,7 @@ char *inline_scripts_in_html(long len, char *source)
                 // to duplicate string
                 char *script_tag = malloc(tok_len * sizeof(char));
                 memcpy(script_tag, token, tok_len);
+                script_tag[tok_len] = 0;
 
                 char *word = strtok(script_tag, word_delim);
                 while (word)
@@ -307,9 +308,17 @@ char *inline_scripts_in_html(long len, char *source)
                     logv("currently looking at word: %s\n", word);
                     if (str_startswith(word, "src="))
                     {
-                        sscanf(word, "src=\"%s\"", &script_src_path);
                         logv("this word starts with \"src=\"\n");
+                        logv("word = 0x%p\n", word);
+                        logv("script_src_path = %p\n", script_src_path);
+                        logv("strlen(word) = %d\n", strlen(word));
+                        // logv("strlen(word) - strlen(\"src=\\\"\\\"\") = ", strlen(word) - strlen("src=\"\""));
+                        script_src_path = malloc((strlen(word) - (size_t)6) * sizeof(char));
+                        logv("script_src_path = %p\n", script_src_path);
+                        logv("*script_src_path = %s\n", script_src_path);
+                        sscanf(word, "src=\"%s", script_src_path);
                         logv("the source path for this script is %s\n", script_src_path);
+                        script_src_path[strlen(script_src_path) - 1] = 0;
                         ext_src = true;
                     }
                     if (str_startswith(word, "defer"))
@@ -321,8 +330,45 @@ char *inline_scripts_in_html(long len, char *source)
                 }
                 prev_script_src = ext_src;
 
+                if (defer)
+                    logv("this tag is deferred\n");
                 if (ext_src)
                 {
+                    logv("script_src_path = %s\n", script_src_path);
+                    logv("args.input_file = %s\n", args.input_file);
+
+                    char *real_src_path = refactor_relative_path(script_src_path, args.input_file);
+                    char *script = read_file(real_src_path);
+
+                    logv("javascript source is:\n%s\n", script);
+
+                    size_t script_len = strlen(script) + strlen("<script>") + strlen("</script>");
+                    char *to_append;
+
+                    to_append = calloc(script_len, sizeof(char));
+                    logv("`to_append` = %p\n", to_append);
+
+                    strcat(to_append, "<script>");
+                    strcat(to_append, script);
+                    strcat(to_append, "</script>");
+
+                    if (!defer)
+                    {
+                        logv("setting `append` to:\n%s\n", to_append);
+                        append = to_append;
+                        append_len = script_len;
+                    }
+                    else
+                    {
+                        after_body = realloc(after_body, ++after_body_len * sizeof(after_body[0]));
+                        after_body[after_body_len - 1] = to_append;
+                        append = "";
+                        append_len = 0;
+                    }
+                }
+                else
+                {
+                    append = NULL; // continue as-is
                 }
             }
             else
@@ -330,18 +376,6 @@ char *inline_scripts_in_html(long len, char *source)
                 prev_script_src = false; // if no attributes, it's not a source script
             }
             logv("this script tag %s an external source\n", ext_src ? "is" : "is not");
-            if (defer)
-                logv("this tag is deferred\n");
-            if (ext_src)
-            {
-                append = "";
-                append_len = 0;
-                // TODO: read file, edit append, check for defer
-            }
-            else
-            {
-                append = NULL; // continue as-is
-            }
         }
         else if (str_startswith(token, "</script"))
         {
@@ -363,8 +397,83 @@ char *inline_scripts_in_html(long len, char *source)
         if (str_startswith(token, "<link"))
         {
             logv("link tag detected\n");
+
+            bool stylesheet = false;
+            char *stylesheet_src_path;
+
+            char *link_tag = malloc(tok_len);
+            memcpy(link_tag, token, tok_len);
+
+            char *word = strtok(link_tag, word_delim);
+            while (word)
+            {
+                logv("currently looking at word: %s\n", word);
+                if (str_startswith(word, "rel=\"stylesheet\""))
+                {
+                    stylesheet = true;
+                }
+                if (str_startswith(word, "href=\""))
+                {
+                    logv("strlen(word) = %d\n", strlen(word));
+                    // logv("strlen(word) - strlen(\"src=\\\"\\\"\") = ", strlen(word) - strlen("src=\"\""));
+                    stylesheet_src_path = calloc((strlen(word) - strlen("href=\"\"")), sizeof(char));
+                    logv("stylesheet_src_path = %p\n", stylesheet_src_path);
+                    logv("*stylesheet_src_path = %s\n", stylesheet_src_path);
+                    sscanf(word, "href=\"%s", stylesheet_src_path);
+                    logv("the source path for this script is %s\n", stylesheet_src_path);
+                    stylesheet_src_path[strlen(stylesheet_src_path) - 1] = 0;
+                }
+                word = strtok(NULL, word_delim);
+            }
+
+            if (stylesheet)
+            {
+                logv("this links to a stylesheet\n");
+
+                logv("stylesheet_src_path = %s\n", stylesheet_src_path);
+                logv("args.input_file = %s\n", args.input_file);
+
+                if (!(*stylesheet_src_path))
+                {
+                    error("no href provided in stylesheet link");
+                }
+
+                char *real_src_path = refactor_relative_path(stylesheet_src_path, args.input_file);
+                char *style = read_file(real_src_path);
+
+                logv("style source is:\n%s\n", style);
+
+                size_t style_len = strlen(style) + strlen("<style>") + strlen("</style>");
+                char *to_append;
+
+                to_append = calloc(style_len, sizeof(char));
+                logv("`to_append` = %p\n", to_append);
+
+                strcat(to_append, "<style>");
+                strcat(to_append, style);
+                strcat(to_append, "</style>");
+
+                logv("setting `append` to:\n%s\n", to_append);
+                append = to_append;
+                append_len = style_len;
+            }
+            else
+            {
+                append = NULL;
+            }
+        }
+
+        if (str_startswith(token, "</body>"))
+        {
+            logv("detected end body tag\n");
             append = "";
             append_len = 0;
+
+            tmp_append_cstr("</body>");
+            for (size_t i = 0; i < after_body_len; i++)
+            {
+                tmp_append_cstr(after_body[i]);
+            }
         }
 
         if (append)
@@ -394,7 +503,9 @@ char *inline_scripts_in_html(long len, char *source)
     }
 
     ret = malloc(tmp_buf_sz);
-    memcpy(ret, tmp_buf, tmp_buf_sz);
+    memcpy(ret, tmp_buf + original_sz, tmp_end() - rewind);
+
+    tmp_rewind(rewind);
 
     return ret;
 }
