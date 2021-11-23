@@ -38,7 +38,7 @@ int logv(const char *format, ...)
 
 void error(const char *message)
 {
-    fprintf(stderr, "\033[38;2;128;0;0mERROR: %s\n", message);
+    fprintf(stderr, "ERROR: %s\n", message);
     exit(1);
 }
 
