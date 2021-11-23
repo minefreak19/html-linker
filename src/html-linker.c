@@ -109,6 +109,12 @@ char *read_file(const char *path)
 {
     logv("opening file %s\n", path);
     FILE *file = fopen(path, MODE_READ);
+
+    if (!file)
+    {
+        fprintf(stderr, "error: could not find file at %s\n", path);
+        exit(1);
+    }
     char *result;
 
     // go to the end, and then find out where the cursor is

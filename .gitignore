@@ -1,0 +1,5 @@
+# editor stuff
+.vscode/
+
+# embarrassing batch scripts i wrote for development
+*.bat
