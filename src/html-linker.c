@@ -52,6 +52,7 @@ bool str_arr_contains(char *str, int arrlen, char *arr[])
 
     return true;
 }
+
 #define VERBOSE_DEFAULT false
 
 void print_args(arguments *args)
@@ -139,8 +140,8 @@ char *read_file(const char *path)
 // buffer to be used for string concatenation, etc
 //  simpler than dealing with malloc() and free() for this use case
 
-// definitely aren't going to be writing 8KB of html anytime soon
-#define TMP_BUFFER_CAP (8192)
+// definitely aren't going to be writing 1MB of html anytime soon
+#define TMP_BUFFER_CAP (1048576)
 char tmp_buf[TMP_BUFFER_CAP];
 size_t tmp_buf_sz;
 
@@ -188,15 +189,19 @@ void tmpcpy(char *to)
 
 char *refactor_relative_path(const char *path, const char *relative_to)
 {
+    logv("refactoring path \"%s\" relative to \"%s\"\n", path, relative_to);
     char *rewind = tmp_end();
+    logv("current size of tmp: %I32u\n", tmp_buf_sz);
     size_t original_size = tmp_buf_sz;
 
     char *ret;
 
     char *last_slash = strrchr(relative_to, '\\');
+    logv("last_slash = %p\n", last_slash);
     if (!last_slash)
     {
         last_slash = strrchr(relative_to, '/');
+        logv("last_slash = %p\n", last_slash);
         if (!last_slash)
         {
             error("no file separators found in argument relative_to");
@@ -205,6 +210,7 @@ char *refactor_relative_path(const char *path, const char *relative_to)
 
     // we need the char after the slash
     last_slash++;
+    logv("last_slash = %p\n", last_slash);
 
     tmp_append_str(relative_to, last_slash - relative_to);
     tmp_append_cstr(path);
