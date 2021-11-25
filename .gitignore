@@ -3,3 +3,6 @@
 
 # embarrassing batch scripts i wrote for development
 *.bat
+
+# version compiled for debugging
+./run

@@ -6,13 +6,14 @@
 #include <math.h>
 #include <assert.h>
 
-// define it up here so util functions can access it
+// define it up here so logv can access it
 typedef struct arguments arguments;
 struct arguments
 {
     char *input_file;
     char *out_file;
     bool verbose;
+    size_t tmp_mem;
 };
 
 arguments args;
@@ -46,11 +47,23 @@ bool str_arr_contains(char *str, int arrlen, char *arr[])
 {
     for (int i = 0; i < arrlen; i++)
     {
-        if (!streq(str, arr[i]))
-            return false;
+        if (streq(str, arr[i]))
+            return true;
     }
 
-    return true;
+    return false;
+}
+
+// to be safe when using malloc/chkmem(calloc in case they return null
+void *chkmem(void *ptr)
+{
+    if (ptr == NULL)
+    {
+        fprintf(stderr, "MEMORY ERROR: Pointer allocated was NULL. Possibly out of memory.");
+        exit(2);
+    }
+    else
+        return ptr;
 }
 
 #define VERBOSE_DEFAULT false
@@ -64,7 +77,7 @@ void print_args(arguments *args)
     printf("\n\tFLAGS:\n");
     printf("\tverbose: %s\n", args->verbose ? "true" : "false");
 
-    puts(""); // insert extra newline
+    printf("\n");
 }
 
 arguments parse_args(int argc, char *args[])
@@ -126,7 +139,7 @@ char *read_file(const char *path)
     fseek(file, 0l, SEEK_SET);
 
     // leave space for ze null byte
-    result = calloc(len + 1, sizeof(char));
+    result = chkmem(calloc(len + 1, sizeof(char)));
 
     // actually read the file
     fread(result, sizeof(char), len, file);
@@ -141,18 +154,37 @@ char *read_file(const char *path)
 //  simpler than dealing with malloc() and free() for this use case
 
 // definitely aren't going to be writing 1MB of html anytime soon
-#define TMP_BUFFER_CAP (1048576)
-char tmp_buf[TMP_BUFFER_CAP];
-size_t tmp_buf_sz;
+// #define DEF_TMP_BUF_CAP (1048576)
+#define DEF_TMP_BUF_CAP (1024)
+size_t tmp_buf_cap = DEF_TMP_BUF_CAP;
+char *tmp_buf = NULL;
+size_t tmp_buf_sz = 0;
+
+void tmp_init()
+{
+    tmp_buf = malloc(tmp_buf_cap * sizeof(char));
+}
 
 char *tmp_end(void)
 {
     return tmp_buf + tmp_buf_sz;
 }
 
+void tmp_ensure(size_t size)
+{
+    size_t req_sz = size + tmp_buf_sz;
+    if (req_sz > tmp_buf_cap)
+    {
+        tmp_buf = chkmem(realloc(tmp_buf, req_sz));
+        tmp_buf_cap = req_sz;
+        // TODO remove
+        printf("reallocating tmp buffer to size %u\n", (unsigned)req_sz);
+    }
+}
+
 char *tmp_alloc(size_t size)
 {
-    assert(size + tmp_buf_sz < TMP_BUFFER_CAP);
+    tmp_ensure(size);
     char *result = tmp_end();
     tmp_buf_sz += size;
     return result;
@@ -161,6 +193,7 @@ char *tmp_alloc(size_t size)
 char *tmp_append_char(char c)
 {
     *(tmp_alloc(1)) = c;
+    return tmp_end();
 }
 
 char *tmp_append_str(const char *str, size_t len)
@@ -216,7 +249,7 @@ char *refactor_relative_path(const char *path, const char *relative_to)
     tmp_append_cstr(path);
     tmp_append_char(0); // terminate string
 
-    ret = malloc(tmp_end() - rewind);
+    ret = chkmem(malloc(tmp_end() - rewind));
     memcpy(ret, tmp_buf + original_size, tmp_end() - rewind);
 
     tmp_rewind(rewind);
@@ -258,9 +291,9 @@ char *inline_scripts_in_html(long len, char *source)
             }
 
             if (!token_indexes)
-                token_indexes = malloc(++index_count * sizeof(int));
+                token_indexes = chkmem(malloc(++index_count * sizeof(int)));
             else
-                token_indexes = realloc(token_indexes, ++index_count * sizeof(token_indexes[0]));
+                token_indexes = chkmem(realloc(token_indexes, ++index_count * sizeof(token_indexes[0])));
             token_indexes[index_count - 1] = cursor;
         }
 
@@ -270,7 +303,7 @@ char *inline_scripts_in_html(long len, char *source)
 
     // add the string length as a token index
     //  so it stops reading tokens when it gets to the end
-    token_indexes = realloc(token_indexes, (index_count + 1) * sizeof(token_indexes[0]));
+    token_indexes = chkmem(realloc(token_indexes, (index_count + 1) * sizeof(token_indexes[0])));
     token_indexes[index_count] = len;
 
     logv("index_count = %d\n", index_count);
@@ -278,14 +311,14 @@ char *inline_scripts_in_html(long len, char *source)
     const char word_delim[] = "> ";
 
     size_t after_body_len = 0;
-    char **after_body = (char **)malloc(after_body_len * sizeof(after_body[0]));
+    char **after_body = chkmem(malloc(after_body_len * sizeof(after_body[0])));
 
     // should the current token be appended to the final file?
     char *append = NULL;
     size_t append_len = 0;
 
     // definitely terrible practice but
-    bool prev_script_src = false, prev_style_src = false;
+    bool prev_script_src = false;
     for (int i = 0; i < index_count; i++)
     {
         logv("Token %d: \n", i);
@@ -310,7 +343,7 @@ char *inline_scripts_in_html(long len, char *source)
                 char *script_src_path;
 
                 // to duplicate string
-                char *script_tag = malloc(tok_len * sizeof(char));
+                char *script_tag = chkmem(malloc(tok_len * sizeof(char)));
                 memcpy(script_tag, token, tok_len);
                 script_tag[tok_len] = 0;
 
@@ -324,8 +357,14 @@ char *inline_scripts_in_html(long len, char *source)
                         logv("word = 0x%p\n", word);
                         logv("script_src_path = %p\n", script_src_path);
                         logv("strlen(word) = %d\n", strlen(word));
+                        logv("%d\n", strlen("src=\"\""));
+                        size_t diff = strlen(word) - strlen("src=\"\"");
+                        logv("%zu\n", diff);
+                        logv("%zu\n", (size_t)9);
+                        malloc((size_t)9);
+                        logv("passed 1 calloc\n");
                         // logv("strlen(word) - strlen(\"src=\\\"\\\"\") = ", strlen(word) - strlen("src=\"\""));
-                        script_src_path = malloc((strlen(word) - (size_t)6) * sizeof(char));
+                        script_src_path = chkmem(malloc((strlen(word) - strlen("src=\"\"")) * (size_t)sizeof(char)));
                         logv("script_src_path = %p\n", script_src_path);
                         logv("*script_src_path = %s\n", script_src_path);
                         sscanf(word, "src=\"%s", script_src_path);
@@ -357,7 +396,7 @@ char *inline_scripts_in_html(long len, char *source)
                     size_t script_len = strlen(script) + strlen("<script>") + strlen("</script>");
                     char *to_append;
 
-                    to_append = calloc(script_len, sizeof(char));
+                    to_append = chkmem(calloc(script_len, sizeof(char)));
                     logv("`to_append` = %p\n", to_append);
 
                     strcat(to_append, "<script>");
@@ -372,7 +411,7 @@ char *inline_scripts_in_html(long len, char *source)
                     }
                     else
                     {
-                        after_body = realloc(after_body, ++after_body_len * sizeof(after_body[0]));
+                        after_body = chkmem(realloc(after_body, ++after_body_len * sizeof(after_body[0])));
                         after_body[after_body_len - 1] = to_append;
                         append = "";
                         append_len = 0;
@@ -413,7 +452,7 @@ char *inline_scripts_in_html(long len, char *source)
             bool stylesheet = false;
             char *stylesheet_src_path;
 
-            char *link_tag = malloc(tok_len);
+            char *link_tag = chkmem(malloc(tok_len));
             memcpy(link_tag, token, tok_len);
 
             char *word = strtok(link_tag, word_delim);
@@ -428,7 +467,7 @@ char *inline_scripts_in_html(long len, char *source)
                 {
                     logv("strlen(word) = %d\n", strlen(word));
                     // logv("strlen(word) - strlen(\"src=\\\"\\\"\") = ", strlen(word) - strlen("src=\"\""));
-                    stylesheet_src_path = calloc((strlen(word) - strlen("href=\"\"")), sizeof(char));
+                    stylesheet_src_path = chkmem(calloc((strlen(word) - strlen("href=\"\"")), sizeof(char)));
                     logv("stylesheet_src_path = %p\n", stylesheet_src_path);
                     logv("*stylesheet_src_path = %s\n", stylesheet_src_path);
                     sscanf(word, "href=\"%s", stylesheet_src_path);
@@ -458,7 +497,7 @@ char *inline_scripts_in_html(long len, char *source)
                 size_t style_len = strlen(style) + strlen("<style>") + strlen("</style>");
                 char *to_append;
 
-                to_append = calloc(style_len, sizeof(char));
+                to_append = chkmem(calloc(style_len, sizeof(char)));
                 logv("`to_append` = %p\n", to_append);
 
                 strcat(to_append, "<style>");
@@ -514,7 +553,7 @@ char *inline_scripts_in_html(long len, char *source)
         }
     }
 
-    ret = malloc(tmp_buf_sz);
+    ret = chkmem(malloc(tmp_buf_sz));
     memcpy(ret, tmp_buf + original_sz, tmp_end() - rewind);
 
     tmp_rewind(rewind);
@@ -522,18 +561,11 @@ char *inline_scripts_in_html(long len, char *source)
     return ret;
 }
 
-int main(int argc, char *cmdargs[])
+void html_linker(void)
 {
-    args = parse_args(argc, cmdargs);
     FILE *input_file, *output_file;
     char *contents;
-    long int bytes_input, bytes_output;
-
-    if (args.verbose)
-        puts("Verbose mode ENABLED");
-
-    if (args.verbose)
-        print_args(&args);
+    long int bytes_input;
 
     // read input file
     logv("Opening input file...\n");
@@ -547,17 +579,17 @@ int main(int argc, char *cmdargs[])
 
     fseek(input_file, 0l, SEEK_SET); // go to beginning of input_file
 
-    contents = calloc(bytes_input, sizeof(char));
+    contents = chkmem(calloc(bytes_input, sizeof(char)));
     logv("Allocated ptr 0x%p to contents\n", contents);
 
     if (contents == NULL)
-        error("Memory error: calloc() returned NULL");
+        error("Memory error: chkmem(calloc() returned NULL");
 
     logv("Reading input file...\n");
     fread(contents, sizeof(char), bytes_input, input_file);
     logv("Read: \n%s\n\n", contents);
 
-    char *to_parse = (char *)malloc(bytes_input * sizeof(char));
+    char *to_parse = chkmem(malloc(bytes_input * sizeof(char)));
     logv("allocated ptr %p to variable to_parse\n", to_parse);
 
     logv("Copying contents of input file to variable to_parse...\n");
@@ -580,12 +612,25 @@ int main(int argc, char *cmdargs[])
     else
         fprintf(output_file, "%s", to_write);
 
-    printf("Successfully wrote %d bytes to %s\n", ftell(output_file), args.out_file);
+    printf("Successfully wrote %ld bytes to %s\n", ftell(output_file), args.out_file);
 
     fclose(input_file);
     logv("closed input_file\n");
     fclose(output_file);
     logv("closed output_file\n");
+}
 
-    return 0;
+int main(int argc, char *argv[])
+{
+    tmp_init();
+
+    args = parse_args(argc, argv);
+
+    if (args.verbose)
+        puts("Verbose mode ENABLED");
+
+    if (args.verbose)
+        print_args(&args);
+
+    html_linker();
 }
