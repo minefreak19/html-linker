@@ -175,9 +175,10 @@ void tmp_ensure(size_t size)
     size_t req_sz = size + tmp_buf_sz;
     if (req_sz > tmp_buf_cap)
     {
-        tmp_buf = chkmem(realloc(tmp_buf, req_sz));
         tmp_buf_cap = req_sz;
-        // TODO remove
+        tmp_buf = chkmem(realloc(tmp_buf, req_sz));
+        // the casting makes the compiler happy
+        // i'm sure theres a fix but this works
         printf("reallocating tmp buffer to size %u\n", (unsigned)req_sz);
     }
 }
@@ -210,9 +211,9 @@ char *tmp_append_cstr(const char *cstr)
 
 void tmp_clean(void) { tmp_buf_sz = 0; }
 
-void tmp_rewind(const char *end)
+void tmp_rewind(size_t old_sz)
 {
-    tmp_buf_sz = end - tmp_buf;
+    tmp_buf_sz = old_sz;
 }
 
 void tmpcpy(char *to)
@@ -223,9 +224,8 @@ void tmpcpy(char *to)
 char *refactor_relative_path(const char *path, const char *relative_to)
 {
     logv("refactoring path \"%s\" relative to \"%s\"\n", path, relative_to);
-    char *rewind = tmp_end();
     logv("current size of tmp: %I32u\n", tmp_buf_sz);
-    size_t original_size = tmp_buf_sz;
+    size_t rewind = tmp_buf_sz;
 
     char *ret;
 
@@ -249,8 +249,8 @@ char *refactor_relative_path(const char *path, const char *relative_to)
     tmp_append_cstr(path);
     tmp_append_char(0); // terminate string
 
-    ret = chkmem(malloc(tmp_end() - rewind));
-    memcpy(ret, tmp_buf + original_size, tmp_end() - rewind);
+    ret = chkmem(malloc(tmp_buf_sz - rewind));
+    memcpy(ret, tmp_buf + rewind, tmp_buf_sz - rewind);
 
     tmp_rewind(rewind);
 
@@ -260,8 +260,7 @@ char *refactor_relative_path(const char *path, const char *relative_to)
 
 char *inline_scripts_in_html(long len, char *source)
 {
-    char *rewind = tmp_end();
-    size_t original_sz = tmp_buf_sz;
+    size_t rewind = tmp_buf_sz;
 
     char *ret;
     int *token_indexes = NULL, index_count = 0, cursor = 0;
@@ -357,14 +356,8 @@ char *inline_scripts_in_html(long len, char *source)
                         logv("word = 0x%p\n", word);
                         logv("script_src_path = %p\n", script_src_path);
                         logv("strlen(word) = %d\n", strlen(word));
-                        logv("%d\n", strlen("src=\"\""));
-                        size_t diff = strlen(word) - strlen("src=\"\"");
-                        logv("%zu\n", diff);
-                        logv("%zu\n", (size_t)9);
-                        malloc((size_t)9);
-                        logv("passed 1 calloc\n");
-                        // logv("strlen(word) - strlen(\"src=\\\"\\\"\") = ", strlen(word) - strlen("src=\"\""));
-                        script_src_path = chkmem(malloc((strlen(word) - strlen("src=\"\"")) * (size_t)sizeof(char)));
+                        script_src_path = chkmem(malloc((strlen(word) - strlen("src=\"\"")) * sizeof(char)));
+
                         logv("script_src_path = %p\n", script_src_path);
                         logv("*script_src_path = %s\n", script_src_path);
                         sscanf(word, "src=\"%s", script_src_path);
@@ -554,7 +547,7 @@ char *inline_scripts_in_html(long len, char *source)
     }
 
     ret = chkmem(malloc(tmp_buf_sz));
-    memcpy(ret, tmp_buf + original_sz, tmp_end() - rewind);
+    memcpy(ret, tmp_buf + rewind, tmp_buf_sz - rewind);
 
     tmp_rewind(rewind);
 

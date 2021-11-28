@@ -5,4 +5,4 @@
 *.bat
 
 # version compiled for debugging
-./run
+run
