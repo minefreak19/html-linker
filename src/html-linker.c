@@ -6,6 +6,10 @@
 #include <math.h>
 #include <assert.h>
 
+// exit codes
+#define EXIT_MEMORYERR 2
+#define EXIT_INVALIDARG 3
+
 // define it up here so logv can access it
 typedef struct arguments arguments;
 struct arguments
@@ -46,7 +50,7 @@ int logv(const char *format, ...)
 void error(const char *message)
 {
     fprintf(stderr, "ERROR: %s\n", message);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 bool str_arr_contains(char *str, int arrlen, char *arr[])
@@ -66,7 +70,7 @@ void *chkmem(void *ptr)
     if (ptr == NULL)
     {
         fprintf(stderr, "MEMORY ERROR: Pointer allocated was NULL. Possibly out of memory.");
-        exit(2);
+        exit(EXIT_MEMORYERR);
     }
     else
         return ptr;
@@ -92,6 +96,7 @@ void print_usage(char *executable_name)
     printf("USAGE: %s [flags] <inputFile> -o <outputFile>\n", strrchr(executable_name, PATH_SEPARATOR) + 1);
     printf("FLAGS:\n");
     printf("\t-v | --verbose: Enables verbose mode for debugging.\n");
+    printf("\t--help: Display this list.\n");
 }
 
 arguments parse_args(int argc, char *args[])
@@ -124,6 +129,11 @@ arguments parse_args(int argc, char *args[])
         {
             res.verbose = true;
             continue;
+        }
+        if (streq(arg, "--help"))
+        {
+            print_usage(args[0]);
+            exit(0);
         }
 
         // the only argument left after all this should be the input file
@@ -538,10 +548,7 @@ char *inline_scripts_in_html(long len, char *source)
             }
         }
 
-        if (append)
-        {
-        }
-        else
+        if (!append)
         {
             append = token;
             append_len = tok_len;
@@ -582,6 +589,11 @@ void html_linker(void)
     logv("Opening input file...\n");
     logv("args.input_file = %s\n", args.input_file);
     input_file = fopen(args.input_file, MODE_READ);
+    if (input_file == NULL)
+    {
+        fprintf(stderr, "ERROR: Couldn't open input file \"%s\"\n", args.input_file);
+        exit(EXIT_INVALIDARG);
+    }
     logv("input_file points to %p\n", input_file);
 
     fseek(input_file, 0l, SEEK_END); // go to end of input_file
@@ -614,6 +626,11 @@ void html_linker(void)
     // write to output file
     logv("opening output file in write mode...\n");
     output_file = fopen(args.out_file, MODE_WRITE);
+    if (output_file == NULL)
+    {
+        fprintf(stderr, "ERROR: Couldn't open output file \"%s\"\n", args.out_file);
+        exit(EXIT_INVALIDARG);
+    }
 
     fseek(output_file, 0l, SEEK_SET);
 
@@ -644,4 +661,6 @@ int main(int argc, char *argv[])
         print_args(&args);
 
     html_linker();
+
+    return EXIT_SUCCESS;
 }
