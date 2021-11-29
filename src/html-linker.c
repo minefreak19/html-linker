@@ -19,6 +19,12 @@ struct arguments
 arguments args;
 
 // utils
+#ifdef _WIN32
+#define PATH_SEPARATOR ('\\')
+#else
+#define PATH_SEPARATOR ('/')
+#endif // __win32
+
 #define streq(a, b) (strcmp(a, b) == 0)
 #define strcontains(a, b, idx) (strstr(a + idx, b) != NULL)
 #define str_startswith(a, b) ((strncmp(a, b, strlen(b))) == 0)
@@ -80,6 +86,14 @@ void print_args(arguments *args)
     printf("\n");
 }
 
+void print_usage(char *executable_name)
+{
+    // start immediately after the last slash to get only the executable name
+    printf("USAGE: %s [flags] <inputFile> -o <outputFile>\n", strrchr(executable_name, PATH_SEPARATOR) + 1);
+    printf("FLAGS:\n");
+    printf("\t-v | --verbose: Enables verbose mode for debugging.\n");
+}
+
 arguments parse_args(int argc, char *args[])
 {
     arguments res;
@@ -87,7 +101,10 @@ arguments parse_args(int argc, char *args[])
     res.verbose = VERBOSE_DEFAULT;
 
     if (argc <= 3)
+    {
+        print_usage(args[0]);
         error("Too few arguments.");
+    }
     char *arg;
     for (int i = 1 /*ignore executable filename*/; i < argc; i++)
     {
@@ -229,6 +246,7 @@ char *refactor_relative_path(const char *path, const char *relative_to)
 
     char *ret;
 
+    // not using PATH_SEPARATOR because we want to support forward-slash paths on windows too
     char *last_slash = strrchr(relative_to, '\\');
     logv("last_slash = %p\n", last_slash);
     if (!last_slash)
