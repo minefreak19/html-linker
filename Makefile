@@ -1,20 +1,28 @@
 WCC = x86_64-w64-mingw32-gcc
 CC = gcc
-CPP = g++
-CFLAGS = -std=c11 -g -pedantic -Werror -Wall
+CFLAGS = -std=c11 -g -pedantic -Werror -Wall -D_DEBUG
 
-c_source_files = $(wildcard src/*.c)
-cpp_source_files = $(wildcard src/*.cpp)
+BINDIR = bin
 
-all: windows linux
+SRCDIR = src
+INCDIR = include
 
-windows: bin/htmll.exe
-linux: ./run
+INCDIRS = $(sort $(dir $(wildcard $(INCDIR)/**/)))
 
-# actual version i'm using, for windows
-bin/htmll.exe: $(c_source_files)
-	$(WCC) $(CFLAGS) -o $@ $^
+c_source_files = $(wildcard $(SRCDIR)/*.c) $(wildcard $(SRCDIR)/**/*.c)
+include_files = $(wildcard $(INCDIR)/*.h) $(wildcard $(INCDIR)/**/*.h)
 
-# for linux testing
-./run: $(c_source_files)
-	$(CC) $(CFLAGS) -o $@ $^
+INCARGS = $(foreach incdir,$(INCDIRS),$(addprefix -I,$(incdir)))
+
+.PHONY: all run clean
+
+run: all
+	./bin/htmll test/src/index.html -o test/out/index.html
+
+all: $(BINDIR)/htmll $(include_files) # recompile if include files change
+
+$(BINDIR)/%: $(c_source_files)
+	$(CC) $(CFLAGS) -o $@ $^ $(INCARGS)
+
+clean: 
+	rm $(wildcard $(BINDIR)/*)
