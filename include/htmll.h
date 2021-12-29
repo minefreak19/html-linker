@@ -19,7 +19,7 @@ struct Arguments {
     Cstr output_file;
 };
 
-void htmll(const struct Arguments *, Buffer *);
+void htmll(const struct Arguments *);
 
 #ifdef __cplusplus
 }

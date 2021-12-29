@@ -33,7 +33,7 @@ typedef const char *Cstr;
 #  define PANIC(...) panic_debug(__FILE__, __LINE__, __func__, __VA_ARGS__)
 # else 
 #  define NOTNULL(ptr) notnull_impl(ptr)
-#  define PANIC(message, ...) panic_impl(message, __VA_ARGS__)
+#  define PANIC(...) panic_impl(__VA_ARGS__)
 #endif
 
 void panic_debug(Cstr file, size_t line, Cstr func, Cstr message, ...) PRINTF_FORMAT(4, 5);

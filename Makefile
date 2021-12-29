@@ -1,6 +1,6 @@
 WCC = x86_64-w64-mingw32-gcc
 CC = gcc
-CFLAGS = -std=c11 -g -pedantic -Werror -Wall -D_DEBUG
+# CFLAGS = -std=c11 -g -pedantic -Werror -Wall -D_DEBUG
 
 BINDIR = bin
 
