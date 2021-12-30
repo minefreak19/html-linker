@@ -272,39 +272,40 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
     }
 }
 
-static void print_html_link_tag(FILE *stream, HTML_Link_Tag tag)
+static void print_html_link_tag(FILE *stream, HTML_Tag tag)
 {
-    fprintf(stream, "       HTML_Link_Tag {\n"
+    assert(tag.type == HTML_TAG_TYPE_LINK);
+    fprintf(stream, "       HTML_Link_tag.as.link {\n"
                     "           href = `"SV_Fmt"`,\n"
                     "           rel = `"SV_Fmt"`,\n"
                     "       }\n",
-            SV_Arg(tag.href),
-            SV_Arg(tag.rel));
+            SV_Arg(tag.as.link.href),
+            SV_Arg(tag.as.link.rel));
 }
 
 #define BOOL_TO_STR(b) (b ? "true" : "false")
-static void print_html_script_tag(FILE *stream, HTML_Script_Tag tag)
+static void print_html_script_tag(FILE *stream, HTML_Tag tag)
 {
-    if (!tag.inlyne) {
+    assert(tag.type == HTML_TAG_TYPE_SCRIPT);
+    if (!tag.as.script.inlyne) {
         fprintf(stream, "       HTML_Script_Tag {\n"
                         "           inlined = %s,\n"
                         "           src = `"SV_Fmt"`,\n"
                         "           closed = %s,\n"
                         "           deferred = %s,\n"
                         "       }\n",
-                BOOL_TO_STR(tag.inlyne),
-                SV_Arg(tag.src),
-                BOOL_TO_STR(tag.closed),
-                BOOL_TO_STR(tag.deferred));
+                BOOL_TO_STR(tag.as.script.inlyne),
+                SV_Arg(tag.as.script.src),
+                BOOL_TO_STR(tag.as.script.closed),
+                BOOL_TO_STR(tag.as.script.deferred));
     } else {
         fprintf(stream, "       HTML_Script_Tag {\n"
                         "           inlined = %s,\n"
                         "           closed = %s,\n"
-                        "           deferred = %s,\n"
-                        "       }\n",
-                BOOL_TO_STR(tag.inlyne),
-                BOOL_TO_STR(tag.closed),
-                BOOL_TO_STR(tag.deferred));
+                        "           deferred = %s,\n",
+                BOOL_TO_STR(tag.as.script.inlyne),
+                BOOL_TO_STR(tag.as.script.closed),
+                BOOL_TO_STR(tag.as.script.deferred));
     }
 }
 
@@ -318,11 +319,11 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
             HTML_TAG_TYPE_NAMES[tag.type]);
     switch (tag.type) {
         case HTML_TAG_TYPE_LINK: {
-            print_html_link_tag(stream, tag.as.link);
+            print_html_link_tag(stream, tag);
         } break;
         
         case HTML_TAG_TYPE_SCRIPT: {
-            print_html_script_tag(stream, tag.as.script);
+            print_html_script_tag(stream, tag);
         } break;
     }
 
