@@ -171,8 +171,8 @@ static void parse_html_script_tag(Parser *parser, String_View *source, HTML_Tag 
             }
 
             if (sv_eq(attr_name, (String_View) SV_STATIC("src"))) {
-                result.as.script.inlyne = false;
                 result.as.script.src = attr_value;
+                has_src = true;
             } else if (sv_eq(attr_name, (String_View) SV_STATIC("defer"))) {
                 result.as.script.deferred = true;
             } else if (sv_eq(attr_name, (String_View) SV_STATIC("/"))) {
@@ -181,6 +181,8 @@ static void parse_html_script_tag(Parser *parser, String_View *source, HTML_Tag 
             *source = sv_trim(*source);
         }
     }
+
+    result.as.script.inlyne = !has_src;
 
     if (!(result.as.script.closed)) {
         parser->in_script = true;
@@ -213,9 +215,17 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
         if (!(parser->in_script)) {
             sv_chop_by_delim(source, '<');
             source->data--;
+            source->count++;
             return parse_html_tag(parser, source, out);
         } else {
-            assert(false && "unreachable");
+            // TODO: inlined javascript should be handled properly 
+            //  current implementation gets triggered by `</script>`
+            //  in string literals, comments, etc
+            const String_View end_script_tag = SV_STATIC("</script>");
+            sv_chop_by_sv(source, end_script_tag);
+            source->data  -= end_script_tag.count;
+            source->count += end_script_tag.count;
+            return parse_html_tag(parser, source, out);
         }
     }
 
