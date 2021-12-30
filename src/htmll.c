@@ -110,6 +110,7 @@ typedef struct {
     HTML_Tag_Type type;
     HTML_Tag_As as;
     String_View name;
+    String_View text;
 } HTML_Tag;
 
 typedef struct {
@@ -228,10 +229,24 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
             //  current implementation gets triggered by `</script>`
             //  in string literals, comments, etc
             const String_View end_script_tag = SV_STATIC("</script>");
-            sv_chop_by_sv(source, end_script_tag);
+            String_View inlined_script = sv_chop_by_sv(source, end_script_tag);
             source->data  -= end_script_tag.count;
             source->count += end_script_tag.count;
-            return parse_html_tag(parser, source, out);
+            HTML_Tag result = {
+                .name = SV("__inlined_script__"),
+                .text = inlined_script,
+                .type = HTML_TAG_TYPE_SCRIPT,
+                .as   = {
+                    .script = {
+                        .closed = false,
+                        .deferred = false,
+                        .inlyne = true,
+                        .src = {0},
+                    },
+                },
+            };
+            if (out) *out = result;
+            return true;
         }
     }
 
@@ -306,6 +321,11 @@ static void print_html_script_tag(FILE *stream, HTML_Tag tag)
                 BOOL_TO_STR(tag.as.script.inlyne),
                 BOOL_TO_STR(tag.as.script.closed),
                 BOOL_TO_STR(tag.as.script.deferred));
+        if (!tag.as.script.closed)
+            fprintf(stream, 
+                        "           text = `"SV_Fmt"`,\n",
+                        SV_Arg(tag.text));
+        fprintf(stream, "       }\n");
     }
 }
 
@@ -348,7 +368,6 @@ void htmll(const struct Arguments *args)
         if (success) {
             print_html_tag(stdout, tag);
         }
-        else printf("Could not parse an HTML Tag\n");
     }
 
     buffer_clear(input_buf);
