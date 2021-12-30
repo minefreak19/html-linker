@@ -47,6 +47,7 @@ struct Arguments parse_args(int *argc, Cstr *argv[])
     if (ret.output_file == NULL) {
         usage(stderr, ret.program_name);
         fprintf(stderr, "ERROR: no output file provided\n");
+        exit(1);
     }
 
     return ret;
