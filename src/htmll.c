@@ -71,17 +71,21 @@ typedef enum {
     HTML_TAG_TYPE_SCRIPT,
     HTML_TAG_TYPE_END_SCRIPT,
     HTML_TAG_TYPE_BODY,
+    HTML_TAG_TYPE_END_BODY,
     HTML_TAG_TYPE_OTHER,
 
     COUNT_HTML_TAG_TYPES
 } HTML_Tag_Type;
 
-static_assert(COUNT_HTML_TAG_TYPES == 5, "Exhaustive definition of HTML_TAG_TYPE_NAMES with respect to HTML_Tag_Type's");
+static_assert(COUNT_HTML_TAG_TYPES == 6, "Exhaustive definition of HTML_TAG_TYPE_NAMES with respect to HTML_Tag_Type's");
 const char *const const HTML_TAG_TYPE_NAMES[COUNT_HTML_TAG_TYPES] = {
     [HTML_TAG_TYPE_LINK]       = "LINK",
     [HTML_TAG_TYPE_SCRIPT]     = "SCRIPT",
-    [HTML_TAG_TYPE_END_SCRIPT] = "END SCRIPT",
     [HTML_TAG_TYPE_BODY]       = "BODY",
+
+    [HTML_TAG_TYPE_END_BODY]   = "END BODY",
+    [HTML_TAG_TYPE_END_SCRIPT] = "END SCRIPT",
+    
     [HTML_TAG_TYPE_OTHER]      = "OTHER",
 };
 
@@ -151,6 +155,7 @@ static void parse_html_script_tag(Parser *parser, String_View *source, HTML_Tag 
 {
     assert(source->data != NULL);
     HTML_Tag result = {0};
+    bool has_src = false;
 
     result.type = HTML_TAG_TYPE_SCRIPT;
 
@@ -252,8 +257,10 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
                 return false;
             }
         } else if (sv_eq(name, SV("body"))) {
-            assert(false && "Unimplemented");
-        } else {
+            result.type = HTML_TAG_TYPE_BODY;
+        } else if (sv_eq(name, SV("/body"))) {
+            result.type = HTML_TAG_TYPE_END_BODY;
+        }else {
             result.type = HTML_TAG_TYPE_OTHER;
         }
 
