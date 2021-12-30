@@ -67,7 +67,7 @@ static void read_file_into_buffer(Cstr file_path, Buffer *buf)
 // very rudimentary and non-extensible because we only care about very specific types of tags
 typedef enum {
     HTML_TAG_TYPE_LINK = 0,
-    HTML_TAG_TYPE_END_LINK,
+    // HTML_TAG_TYPE_END_LINK,
     HTML_TAG_TYPE_SCRIPT,
     HTML_TAG_TYPE_END_SCRIPT,
     HTML_TAG_TYPE_BODY,
@@ -76,11 +76,13 @@ typedef enum {
     COUNT_HTML_TAG_TYPES
 } HTML_Tag_Type;
 
+static_assert(COUNT_HTML_TAG_TYPES == 5, "Exhaustive definition of HTML_TAG_TYPE_NAMES with respect to HTML_Tag_Type's");
 const char *const const HTML_TAG_TYPE_NAMES[COUNT_HTML_TAG_TYPES] = {
-    [HTML_TAG_TYPE_LINK] = "LINK",
-    [HTML_TAG_TYPE_SCRIPT] = "SCRIPT",
-    [HTML_TAG_TYPE_BODY] = "BODY",
-    [HTML_TAG_TYPE_OTHER] = "OTHER",
+    [HTML_TAG_TYPE_LINK]       = "LINK",
+    [HTML_TAG_TYPE_SCRIPT]     = "SCRIPT",
+    [HTML_TAG_TYPE_END_SCRIPT] = "END SCRIPT",
+    [HTML_TAG_TYPE_BODY]       = "BODY",
+    [HTML_TAG_TYPE_OTHER]      = "OTHER",
 };
 
 typedef struct {
@@ -90,6 +92,8 @@ typedef struct {
 
 typedef struct {
     bool deferred;
+    bool closed;
+    bool inlyne;
     String_View src;
 } HTML_Script_Tag;
 
@@ -104,8 +108,13 @@ typedef struct {
     String_View name;
 } HTML_Tag;
 
-static void parse_html_link_tag(String_View *source, HTML_Tag *out)
+typedef struct {
+    bool in_script;  
+} Parser;
+
+static void parse_html_link_tag(Parser *parser, String_View *source, HTML_Tag *out)
 {
+    (void) parser;
     assert(source->data);
     HTML_Tag result;
 
@@ -120,9 +129,11 @@ static void parse_html_link_tag(String_View *source, HTML_Tag *out)
             attr_name = sv_chop_by_delim(&attr, '=');
             attr_value = sv_trim(attr);
 
-            // get rid of quotes
-            sv_chop_left(&attr_value, 1);
-            sv_chop_right(&attr_value, 1);
+            if (attr_value.count >= 2) {
+                // get rid of quotes
+                sv_chop_left(&attr_value, 1);
+                sv_chop_right(&attr_value, 1);
+            }
 
             if (sv_eq(attr_name, SV("href"))) {
                 result.as.link.href = attr_value;
@@ -136,10 +147,10 @@ static void parse_html_link_tag(String_View *source, HTML_Tag *out)
     if (out) *out = result;
 }
 
-static void parse_html_script_tag(String_View *source, HTML_Tag *out)
+static void parse_html_script_tag(Parser *parser, String_View *source, HTML_Tag *out)
 {
     assert(source->data != NULL);
-    HTML_Tag result;
+    HTML_Tag result = {0};
 
     result.type = HTML_TAG_TYPE_SCRIPT;
 
@@ -153,23 +164,32 @@ static void parse_html_script_tag(String_View *source, HTML_Tag *out)
             attr_name = sv_chop_by_delim(&attr, '=');
             attr_value = sv_trim(attr);
 
-            // get rid of quotes
-            sv_chop_left(&attr_value, 1);
-            sv_chop_right(&attr_value, 1);
+            if (attr_value.count >= 2) {
+                // get rid of quotes
+                sv_chop_left(&attr_value, 1);
+                sv_chop_right(&attr_value, 1);
+            }
 
             if (sv_eq(attr_name, (String_View) SV_STATIC("src"))) {
+                result.as.script.inlyne = false;
                 result.as.script.src = attr_value;
             } else if (sv_eq(attr_name, (String_View) SV_STATIC("defer"))) {
                 result.as.script.deferred = true;
+            } else if (sv_eq(attr_name, (String_View) SV_STATIC("/"))) {
+                result.as.script.closed = true;
             }
             *source = sv_trim(*source);
         }
     }
 
+    if (!(result.as.script.closed)) {
+        parser->in_script = true;
+    }
+
     if (out) *out = result;
 }
 
-static bool parse_html_tag(String_View *source, HTML_Tag *out)
+static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
 {
     *source = sv_trim_left(*source);
     if (sv_starts_with(*source, (String_View) SV_STATIC("<!DOCTYPE"))) {
@@ -179,7 +199,7 @@ static bool parse_html_tag(String_View *source, HTML_Tag *out)
             exit(1);
         }
 
-        return parse_html_tag(source, out);
+        return parse_html_tag(parser, source, out);
     }
 
     if (sv_starts_with(*source, (String_View) SV_STATIC("<!--"))) {
@@ -190,8 +210,13 @@ static bool parse_html_tag(String_View *source, HTML_Tag *out)
     }
 
     if (!(sv_starts_with(*source, (String_View) SV_STATIC("<")))) {
-        fprintf(stderr, "ERROR: Unexpected character `%c` in HTML tag\n", *source->data);
-        exit(1);
+        if (!(parser->in_script)) {
+            sv_chop_by_delim(source, '<');
+            source->data--;
+            return parse_html_tag(parser, source, out);
+        } else {
+            assert(false && "unreachable");
+        }
     }
 
     {
@@ -206,9 +231,16 @@ static bool parse_html_tag(String_View *source, HTML_Tag *out)
         String_View name = sv_trim(sv_chop_by_delim(&tag, ' '));
 
         if (sv_eq(name, SV("link"))) {
-            parse_html_link_tag(&tag, &result);
+            parse_html_link_tag(parser, &tag, &result);
         } else if (sv_eq(name, SV("script"))) {
-            parse_html_script_tag(&tag, &result);
+            parse_html_script_tag(parser, &tag, &result);
+        } else if (sv_eq(name, SV("/script"))) {
+            if (parser->in_script) {
+                parser->in_script = false;
+                result.type = HTML_TAG_TYPE_END_SCRIPT;
+            } else {
+                return false;
+            }
         } else if (sv_eq(name, SV("body"))) {
             assert(false && "Unimplemented");
         } else {
@@ -232,6 +264,32 @@ static void print_html_link_tag(FILE *stream, HTML_Link_Tag tag)
             SV_Arg(tag.rel));
 }
 
+#define BOOL_TO_STR(b) (b ? "true" : "false")
+static void print_html_script_tag(FILE *stream, HTML_Script_Tag tag)
+{
+    if (!tag.inlyne) {
+        fprintf(stream, "       HTML_Script_Tag {\n"
+                        "           inlined = %s,\n"
+                        "           src = `"SV_Fmt"`,\n"
+                        "           closed = %s,\n"
+                        "           deferred = %s,\n"
+                        "       }\n",
+                BOOL_TO_STR(tag.inlyne),
+                SV_Arg(tag.src),
+                BOOL_TO_STR(tag.closed),
+                BOOL_TO_STR(tag.deferred));
+    } else {
+        fprintf(stream, "       HTML_Script_Tag {\n"
+                        "           inlined = %s,\n"
+                        "           closed = %s,\n"
+                        "           deferred = %s,\n"
+                        "       }\n",
+                BOOL_TO_STR(tag.inlyne),
+                BOOL_TO_STR(tag.closed),
+                BOOL_TO_STR(tag.deferred));
+    }
+}
+
 static void print_html_tag(FILE *stream, HTML_Tag tag)
 {
     fprintf(stream, "HTML_Tag {\n"
@@ -243,6 +301,10 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
     switch (tag.type) {
         case HTML_TAG_TYPE_LINK: {
             print_html_link_tag(stream, tag.as.link);
+        } break;
+        
+        case HTML_TAG_TYPE_SCRIPT: {
+            print_html_script_tag(stream, tag.as.script);
         } break;
     }
 
@@ -262,7 +324,8 @@ void htmll(const struct Arguments *args)
 
     HTML_Tag tag;
     bool success;
-    while (success = parse_html_tag(&contents, &tag)) {
+    Parser parser = {0};
+    while (success = parse_html_tag(&parser, &contents, &tag)) {
         if (success) {
             print_html_tag(stdout, tag);
         }
