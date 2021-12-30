@@ -64,9 +64,12 @@ static void read_file_into_buffer(Cstr file_path, Buffer *buf)
     fclose(infile);
 }
 
+// very rudimentary and non-extensible because we only care about very specific types of tags
 typedef enum {
     HTML_TAG_TYPE_LINK = 0,
+    HTML_TAG_TYPE_END_LINK,
     HTML_TAG_TYPE_SCRIPT,
+    HTML_TAG_TYPE_END_SCRIPT,
     HTML_TAG_TYPE_BODY,
     HTML_TAG_TYPE_OTHER,
 
@@ -87,13 +90,12 @@ typedef struct {
 
 typedef struct {
     bool deferred;
-    const char *src;
+    String_View src;
 } HTML_Script_Tag;
 
 typedef union {
     HTML_Link_Tag link;
     HTML_Script_Tag script;
-
 } HTML_Tag_As;
 
 typedef struct {
@@ -104,7 +106,6 @@ typedef struct {
 
 static void parse_html_link_tag(String_View *source, HTML_Tag *out)
 {
-    printf("Parsing a link tag...\n");
     assert(source->data);
     HTML_Tag result;
 
@@ -127,6 +128,39 @@ static void parse_html_link_tag(String_View *source, HTML_Tag *out)
                 result.as.link.href = attr_value;
             } else if (sv_eq(attr_name, SV("rel"))) {
                 result.as.link.rel = attr_value;
+            }
+            *source = sv_trim(*source);
+        }
+    }
+
+    if (out) *out = result;
+}
+
+static void parse_html_script_tag(String_View *source, HTML_Tag *out)
+{
+    assert(source->data != NULL);
+    HTML_Tag result;
+
+    result.type = HTML_TAG_TYPE_SCRIPT;
+
+    {
+        String_View attr, attr_name, attr_value;
+
+        while (source->count > 0) {
+            attr = sv_chop_by_delim(source, ' ');
+            if (attr.count == 0) continue;
+
+            attr_name = sv_chop_by_delim(&attr, '=');
+            attr_value = sv_trim(attr);
+
+            // get rid of quotes
+            sv_chop_left(&attr_value, 1);
+            sv_chop_right(&attr_value, 1);
+
+            if (sv_eq(attr_name, (String_View) SV_STATIC("src"))) {
+                result.as.script.src = attr_value;
+            } else if (sv_eq(attr_name, (String_View) SV_STATIC("defer"))) {
+                result.as.script.deferred = true;
             }
             *source = sv_trim(*source);
         }
@@ -174,7 +208,7 @@ static bool parse_html_tag(String_View *source, HTML_Tag *out)
         if (sv_eq(name, SV("link"))) {
             parse_html_link_tag(&tag, &result);
         } else if (sv_eq(name, SV("script"))) {
-            assert(false && "Unimplemented");
+            parse_html_script_tag(&tag, &result);
         } else if (sv_eq(name, SV("body"))) {
             assert(false && "Unimplemented");
         } else {
