@@ -199,6 +199,7 @@ static void parse_html_script_tag(Parser *parser, String_View *source, HTML_Tag 
 static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
 {
     *source = sv_trim_left(*source);
+    if (source->count == 0) return false;
     if (sv_starts_with(*source, (String_View) SV_STATIC("<!DOCTYPE"))) {
         sv_chop_by_delim(source, '>');
         if (sv_trim(*source).count == 0) {
