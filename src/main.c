@@ -58,5 +58,6 @@ int main(int argc, const char *argv[])
     Buffer *buffer = new_buffer(0);
 
     htmll(&args);
+    printf("Finished!\n");
     return 0;
 }
