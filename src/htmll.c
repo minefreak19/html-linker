@@ -234,6 +234,7 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
 
     if (!(sv_starts_with(*source, (String_View) SV_STATIC("<")))) {
         if (!(parser->in_script)) {
+            // TODO: Add `ignore-whitespace` option to ignore content that is all whitespace
             String_View content = sv_chop_by_delim(source, '<');
         
             HTML_Tag result = {
@@ -278,10 +279,15 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
     {
         sv_chop_left(source, 1);
         String_View tag = sv_trim(sv_chop_by_delim(source, '>'));
+        
         if (tag.count == 0) {
             fprintf(stderr, "ERROR: Empty HTML tag\n");
         }
 
+        String_View tag_text = tag;
+        tag_text.data  -= 1;
+        tag_text.count += 2;
+       
         HTML_Tag result;
 
         String_View name = sv_trim(sv_chop_by_delim(&tag, ' '));
@@ -306,6 +312,7 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
         }
 
         result.name = name;
+        result.text = tag_text;
 
         if (out) *out = result;
         return true;
@@ -371,12 +378,12 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
             print_html_script_tag(stream, tag);
         } break;
 
-        case HTML_TAG_TYPE_CONTENT: {
-            fprintf(stream, "   text = `"SV_Fmt"`,\n",
-                        SV_Arg(tag.text));
-        } break;
-
         default: {};
+    }
+
+    if (tag.text.count > 0) {
+        fprintf(stream, "   text = `"SV_Fmt"`\n",
+                    SV_Arg(tag.text));
     }
 
     fprintf(stream, "}\n");
