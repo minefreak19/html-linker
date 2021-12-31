@@ -389,14 +389,21 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
     fprintf(stream, "}\n");
 }
 
+static void process_html_tag(Buffer *out, HTML_Tag tag)
+{
+    buffer_append_str(out, tag.text.data, tag.text.count);
+}
+
 // TODOOOO: ECMAScript modules not supported, only includes files directly in html
 void htmll(const struct Arguments *args)
 {
     Buffer *input_buf = new_buffer(0);
+    Buffer *output_buf = new_buffer(0);
 
     assert(args);
 
     assert(args->input_file);
+    assert(args->output_file);
     read_file_into_buffer(args->input_file, input_buf);
     String_View contents = sv_from_parts(input_buf->data, input_buf->size);
 
@@ -406,9 +413,25 @@ void htmll(const struct Arguments *args)
     while ((success = parse_html_tag(&parser, &contents, &tag))) {
         if (success) {
             print_html_tag(stdout, tag);
+            process_html_tag(output_buf, tag);
         }
     }
 
     buffer_clear(input_buf);
     buffer_free(input_buf);
+
+    FILE *outfile = fopen(args->output_file, "wb");
+    if (outfile == NULL) {
+        fprintf(stderr, "ERROR: Could not open file %s: %s\n", 
+                args->output_file, strerror(errno));
+        exit(1);
+    }
+
+    fprintf(outfile, "%s\n", "<!DOCTYPE html>");
+    fprintf(outfile, "%.*s", (int) output_buf->size, output_buf->data);
+
+    fclose(outfile);
+
+    buffer_clear(output_buf);
+    buffer_free(output_buf);
 }
