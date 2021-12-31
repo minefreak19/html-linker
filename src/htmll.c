@@ -389,9 +389,37 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
     fprintf(stream, "}\n");
 }
 
-static void process_html_tag(Buffer *out, HTML_Tag tag)
+typedef struct {
+    Buffer *output;
+    Buffer *after_body;
+} HTML_Linker;
+
+static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
 {
-    buffer_append_str(out, tag.text.data, tag.text.count);
+    switch (tag.type) {
+        case HTML_TAG_TYPE_SCRIPT: {
+            // TODOOOOOOOOOOOOOOOOOOOO: process_html_tag does not grab scripts from files
+            if (tag.as.script.inlyne) {
+                buffer_append_str(linker->output, tag.text.data, tag.text.count);
+            } else {
+                if (tag.as.script.deferred) {
+                    printf("appending `"SV_Fmt"` to linker->after_body\n", SV_Arg(tag.text));
+                    buffer_append_str(linker->after_body, tag.text.data, tag.text.count);
+                } else {
+                    buffer_append_str(linker->output, tag.text.data, tag.text.count);
+                }
+            }
+        } break;
+
+        case HTML_TAG_TYPE_END_BODY: {
+            buffer_append_str(linker->output, tag.text.data, tag.text.count);
+            buffer_append_str(linker->output, linker->after_body->data, linker->after_body->size);
+        } break;
+
+        default: {
+            buffer_append_str(linker->output, tag.text.data, tag.text.count);
+        }
+    }
 }
 
 // TODOOOO: ECMAScript modules not supported, only includes files directly in html
@@ -410,10 +438,14 @@ void htmll(const struct Arguments *args)
     HTML_Tag tag;
     bool success;
     Parser parser = {0};
+    HTML_Linker *linker = &(HTML_Linker) {
+        .output = output_buf,
+        .after_body = new_buffer(0),
+    };
     while ((success = parse_html_tag(&parser, &contents, &tag))) {
         if (success) {
             print_html_tag(stdout, tag);
-            process_html_tag(output_buf, tag);
+            process_html_tag(linker, tag);
         }
     }
 
@@ -431,6 +463,9 @@ void htmll(const struct Arguments *args)
     fprintf(outfile, "%.*s", (int) output_buf->size, output_buf->data);
 
     fclose(outfile);
+
+    buffer_clear(linker->after_body);
+    buffer_free(linker->after_body);
 
     buffer_clear(output_buf);
     buffer_free(output_buf);
