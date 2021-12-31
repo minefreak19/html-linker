@@ -72,19 +72,24 @@ typedef enum {
     HTML_TAG_TYPE_END_SCRIPT,
     HTML_TAG_TYPE_BODY,
     HTML_TAG_TYPE_END_BODY,
+
+    HTML_TAG_TYPE_CONTENT,
+
     HTML_TAG_TYPE_OTHER,
 
     COUNT_HTML_TAG_TYPES
 } HTML_Tag_Type;
 
-static_assert(COUNT_HTML_TAG_TYPES == 6, "Exhaustive definition of HTML_TAG_TYPE_NAMES with respect to HTML_Tag_Type's");
-const char *const const HTML_TAG_TYPE_NAMES[COUNT_HTML_TAG_TYPES] = {
+static_assert(COUNT_HTML_TAG_TYPES == 7, "Exhaustive definition of HTML_TAG_TYPE_NAMES with respect to HTML_Tag_Type's");
+const char *const HTML_TAG_TYPE_NAMES[COUNT_HTML_TAG_TYPES] = {
     [HTML_TAG_TYPE_LINK]       = "LINK",
     [HTML_TAG_TYPE_SCRIPT]     = "SCRIPT",
     [HTML_TAG_TYPE_BODY]       = "BODY",
 
     [HTML_TAG_TYPE_END_BODY]   = "END BODY",
     [HTML_TAG_TYPE_END_SCRIPT] = "END SCRIPT",
+    
+    [HTML_TAG_TYPE_CONTENT]    = "CONTENT",
     
     [HTML_TAG_TYPE_OTHER]      = "OTHER",
 };
@@ -229,10 +234,21 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
 
     if (!(sv_starts_with(*source, (String_View) SV_STATIC("<")))) {
         if (!(parser->in_script)) {
-            sv_chop_by_delim(source, '<');
+            String_View content = sv_chop_by_delim(source, '<');
+        
+            HTML_Tag result = {
+                .name = SV_STATIC("__content__"),
+                .type = HTML_TAG_TYPE_CONTENT,
+                .text = content,
+                .as = {0},
+            };
+
+            if (out) *out = result;
+
             source->data--;
             source->count++;
-            return parse_html_tag(parser, source, out);
+
+            return true;
         } else {
             // TODO: inlined javascript should be handled properly 
             //  current implementation gets triggered by `</script>`
@@ -353,6 +369,11 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
         
         case HTML_TAG_TYPE_SCRIPT: {
             print_html_script_tag(stream, tag);
+        } break;
+
+        case HTML_TAG_TYPE_CONTENT: {
+            fprintf(stream, "   text = `"SV_Fmt"`,\n",
+                        SV_Arg(tag.text));
         } break;
 
         default: {};
