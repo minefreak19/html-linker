@@ -56,7 +56,6 @@ struct Arguments parse_args(int *argc, Cstr *argv[])
 int main(int argc, const char *argv[])
 {
     struct Arguments args = parse_args(&argc, &argv);
-    Buffer *buffer = new_buffer(0);
 
     htmll(&args);
     printf("Finished!\n");

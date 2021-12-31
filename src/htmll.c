@@ -354,6 +354,8 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
         case HTML_TAG_TYPE_SCRIPT: {
             print_html_script_tag(stream, tag);
         } break;
+
+        default: {};
     }
 
     fprintf(stream, "}\n");
@@ -373,7 +375,7 @@ void htmll(const struct Arguments *args)
     HTML_Tag tag;
     bool success;
     Parser parser = {0};
-    while (success = parse_html_tag(&parser, &contents, &tag)) {
+    while ((success = parse_html_tag(&parser, &contents, &tag))) {
         if (success) {
             print_html_tag(stdout, tag);
         }
