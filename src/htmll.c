@@ -234,7 +234,7 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
     }
 
     if (sv_starts_with(*source, (String_View) SV_STATIC("<!--"))) {
-        sv_chop_by_sv(source, SV("-->"));
+        sv_chop_by_sv_left(source, SV("-->"));
         if (sv_trim(*source).count == 0) {
             return false;
         }
@@ -263,7 +263,7 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
             //  current implementation gets triggered by `</script>`
             //  in string literals, comments, etc
             const String_View end_script_tag = SV_STATIC("</script>");
-            String_View inlined_script = sv_chop_by_sv(source, end_script_tag);
+            String_View inlined_script = sv_chop_by_sv_left(source, end_script_tag);
             source->data  -= end_script_tag.count;
             source->count += end_script_tag.count;
             HTML_Tag result = {
