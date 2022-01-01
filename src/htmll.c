@@ -466,7 +466,6 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
     }
 }
 
-// TODOOOO: ECMAScript modules not supported, only includes files directly in html
 void htmll(const struct Arguments *args)
 {
     Buffer *input_buf = new_buffer(0);
