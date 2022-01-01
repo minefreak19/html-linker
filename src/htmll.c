@@ -106,9 +106,14 @@ typedef struct {
     String_View src;
 } HTML_Script_Tag;
 
+typedef struct {
+    HTML_Script_Tag match;
+} HTML_End_Script_Tag;
+
 typedef union {
     HTML_Link_Tag link;
     HTML_Script_Tag script;
+    HTML_End_Script_Tag end_script;
 } HTML_Tag_As;
 
 typedef struct {
@@ -118,8 +123,11 @@ typedef struct {
     String_View text;
 } HTML_Tag;
 
+#define PARSER_SCRIPTS_STACK_CAP 1024
 typedef struct {
-    bool in_script;  
+    bool in_script;
+    HTML_Tag scripts_stack[PARSER_SCRIPTS_STACK_CAP];
+    size_t scripts_stack_sz;
 } Parser;
 
 static void parse_html_link_tag(Parser *parser, String_View *source, HTML_Tag *out)
@@ -296,8 +304,17 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
             parse_html_link_tag(parser, &tag, &result);
         } else if (sv_eq(name, SV("script"))) {
             parse_html_script_tag(parser, &tag, &result);
+            assert(parser->scripts_stack_sz < PARSER_SCRIPTS_STACK_CAP);
+            parser->scripts_stack[parser->scripts_stack_sz++] = result;
         } else if (sv_eq(name, SV("/script"))) {
             if (parser->in_script) {
+                if (!(parser->scripts_stack_sz > 0)) {
+                    fprintf(stderr, "ERROR: unmatched end script tag\n");
+                    exit(1);
+                }
+
+                HTML_Tag prev_script = parser->scripts_stack[--parser->scripts_stack_sz];
+                result.as.end_script.match = prev_script.as.script;
                 parser->in_script = false;
                 result.type = HTML_TAG_TYPE_END_SCRIPT;
             } else {
@@ -322,7 +339,7 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
 static void print_html_link_tag(FILE *stream, HTML_Tag tag)
 {
     assert(tag.type == HTML_TAG_TYPE_LINK);
-    fprintf(stream, "       HTML_Link_tag.as.link {\n"
+    fprintf(stream, "       HTML_Link_Tag {\n"
                     "           href = `"SV_Fmt"`,\n"
                     "           rel = `"SV_Fmt"`,\n"
                     "       }\n",
@@ -361,6 +378,22 @@ static void print_html_script_tag(FILE *stream, HTML_Tag tag)
     }
 }
 
+static void print_html_end_script_tag(FILE *stream, HTML_Tag tag)
+{
+    assert(tag.type == HTML_TAG_TYPE_END_SCRIPT);
+
+    fprintf(stream, "   HTML_End_Script_Tag {\n"
+                    "       match = \n");
+    print_html_script_tag(stream, (HTML_Tag) {
+        .as = { .script = tag.as.end_script.match},
+        .name = {0},
+        .text = {0},
+        .type = HTML_TAG_TYPE_SCRIPT
+    });
+    fprintf(stream, "\n"
+                    "   }\n");
+}
+
 static void print_html_tag(FILE *stream, HTML_Tag tag)
 {
     fprintf(stream, "HTML_Tag {\n"
@@ -376,6 +409,10 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
         
         case HTML_TAG_TYPE_SCRIPT: {
             print_html_script_tag(stream, tag);
+        } break;
+
+        case HTML_TAG_TYPE_END_SCRIPT: {
+            print_html_end_script_tag(stream, tag);
         } break;
 
         default: {};
@@ -411,6 +448,13 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
             }
         } break;
 
+        case HTML_TAG_TYPE_END_SCRIPT: {
+            if (tag.as.end_script.match.deferred) {
+                printf("appending `"SV_Fmt"` to linker->after_body\n", SV_Arg(tag.text));
+                buffer_append_str(linker->after_body, tag.text.data, tag.text.count);
+            }
+        } break;
+
         case HTML_TAG_TYPE_END_BODY: {
             buffer_append_str(linker->output, tag.text.data, tag.text.count);
             buffer_append_str(linker->output, linker->after_body->data, linker->after_body->size);
@@ -437,7 +481,11 @@ void htmll(const struct Arguments *args)
 
     HTML_Tag tag;
     bool success;
-    Parser parser = {0};
+    Parser parser = {
+        .in_script = false,
+        .scripts_stack = {0},
+        .scripts_stack_sz = 0,
+    };
     HTML_Linker *linker = &(HTML_Linker) {
         .output = output_buf,
         .after_body = new_buffer(0),
