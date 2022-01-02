@@ -90,9 +90,9 @@ void buffer_append_fmt(Buffer *buf, const char *format, ...)
 
     va_start(vargs, format);
     // actually do the thing
-    vsnprintf(str, len, format, vargs);
+    vsnprintf(str, len + 1, format, vargs);
 
-    buffer_append_str(buf, str, len - 1);
+    buffer_append_cstr(buf, str);
 
     free(str);
     va_end(vargs);
