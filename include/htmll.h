@@ -13,13 +13,13 @@ extern "C"
 {
 #endif /* __cplusplus */
 
-struct Arguments {
+struct HTML_Linker_Args {
     Cstr program_name;
     Cstr input_file;
     Cstr output_file;
 };
 
-void htmll(const struct Arguments *);
+void htmll(const struct HTML_Linker_Args *);
 
 #ifdef __cplusplus
 }

@@ -14,9 +14,9 @@ void usage(FILE *stream, Cstr program_name)
 }
 
 
-struct Arguments parse_args(int *argc, Cstr *argv[])
+struct HTML_Linker_Args parse_html_linker_args(int *argc, Cstr *argv[])
 {
-    struct Arguments ret = {0};
+    struct HTML_Linker_Args ret = {0};
     ret.program_name = shift_arg(argc, argv);
 
     Cstr arg;
@@ -55,7 +55,7 @@ struct Arguments parse_args(int *argc, Cstr *argv[])
 
 int main(int argc, const char *argv[])
 {
-    struct Arguments args = parse_args(&argc, &argv);
+    struct HTML_Linker_Args args = parse_html_linker_args(&argc, &argv);
 
     htmll(&args);
     printf("Finished!\n");

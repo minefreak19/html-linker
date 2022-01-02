@@ -452,7 +452,7 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
 #endif // _DEBUG
 
 typedef struct {
-    const struct Arguments *args;
+    const struct HTML_Linker_Args *args;
     Buffer *output;
     Buffer *after_body;
 } HTML_Linker;
@@ -545,7 +545,7 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
     }
 }
 
-void htmll(const struct Arguments *args)
+void htmll(const struct HTML_Linker_Args *args)
 {
     Buffer *input_buf = new_buffer(0);
     Buffer *output_buf = new_buffer(0);
