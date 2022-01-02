@@ -64,6 +64,18 @@ static void read_file_into_buffer(Cstr file_path, Buffer *buf)
     fclose(infile);
 }
 
+static void refactor_relative_path(String_View path, String_View relative_to, Buffer *out)
+{
+    String_View path_sep = SV_STATIC(PATH_SEPARATOR);
+    sv_chop_by_sv_right(&relative_to, path_sep);
+    relative_to.count += path_sep.count;
+
+    if (out) {
+        buffer_append_str(out, relative_to.data, relative_to.count);
+        buffer_append_str(out, path.data, path.count);
+    }
+}
+
 // very rudimentary and non-extensible because we only care about very specific types of tags
 typedef enum {
     HTML_TAG_TYPE_LINK = 0,
