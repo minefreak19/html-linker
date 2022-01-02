@@ -447,6 +447,36 @@ typedef struct {
 static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
 {
     switch (tag.type) {
+        case HTML_TAG_TYPE_LINK: {
+            if (sv_eq_ignorecase(tag.as.link.rel, (String_View) SV_STATIC("stylesheet"))) {
+                // simplest way of checking for urls/etc is force all relative directories to be explicit
+                if (sv_starts_with(tag.as.link.href, (String_View) SV_STATIC("."))) {
+                    buffer_append_fmt(linker->output, "<!-- INLINED FROM `"SV_Fmt"` -->", SV_Arg(tag.as.link.href));
+                    buffer_append_cstr(linker->output, "<style>");
+                    {
+                        Buffer *file_path_buf = new_buffer(128);
+
+                        refactor_relative_path(tag.as.link.href,
+                                            sv_from_cstr(linker->args->input_file),
+                                            file_path_buf);
+
+                        char *file_path = NOTNULL(malloc((file_path_buf->size + 1) * sizeof(char)));
+                        memcpy(file_path, file_path_buf->data, file_path_buf->size);
+                        file_path[file_path_buf->size] = '\0';
+
+                        read_file_into_buffer(file_path, linker->output);
+
+                        free(file_path);
+                        buffer_clear(file_path_buf);
+                        buffer_free(file_path_buf);
+                    }
+                    buffer_append_cstr(linker->output, "</style>");
+                }
+            } else {
+                buffer_append_str(linker->output, tag.text.data, tag.text.count);
+            }
+        } break;
+
         case HTML_TAG_TYPE_SCRIPT: {
             if (tag.as.script.inlyne) {
                 buffer_append_str(linker->output, tag.text.data, tag.text.count);
@@ -457,7 +487,7 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
                                 ? linker->after_body
                                 : linker->output;
 
-                buffer_append_fmt (buf, "<!-- INLINED FROM `"SV_Fmt"` -->\n", SV_Arg(tag.as.script.src));
+                buffer_append_fmt (buf, "<!-- INLINED FROM `"SV_Fmt"` -->", SV_Arg(tag.as.script.src));
                 buffer_append_cstr(buf, "<script>");
 
                 {
