@@ -1,6 +1,8 @@
 #include "tmp_buf.h"
 
 #include <assert.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -69,6 +71,31 @@ void buffer_append_cstr(Buffer *buf, const char *cstr)
 {
     assert(cstr != NULL);
     buffer_append_str(buf, cstr, strlen(cstr));
+}
+
+void buffer_append_fmt(Buffer *buf, const char *format, ...)
+{
+    assert(buf != NULL);
+    assert(format != NULL);
+
+    va_list vargs;
+    va_start(vargs, format);
+
+    // grab an estimate
+    size_t len = vsnprintf(NULL, 0, format, vargs); 
+
+    va_end(vargs);
+
+    char *str = NOTNULL(malloc(len * sizeof(char)));
+
+    va_start(vargs, format);
+    // actually do the thing
+    vsnprintf(str, len, format, vargs);
+
+    buffer_append_str(buf, str, len - 1);
+
+    free(str);
+    va_end(vargs);
 }
 
 void buffer_rewind(Buffer * buf, size_t prev_sz)

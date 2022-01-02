@@ -7,6 +7,8 @@ Created 28 December 2021
 
 #include <stddef.h>
 
+#include "util.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -28,6 +30,8 @@ void buffer_free(Buffer *);
 void buffer_append_char(Buffer *, char);
 void buffer_append_str(Buffer *, const char *str, size_t len);
 void buffer_append_cstr(Buffer *, const char *cstr);
+
+void buffer_append_fmt(Buffer *, const char *format, ...) PRINTF_FORMAT(2, 3);
 
 void buffer_rewind(Buffer *, size_t prev_sz);
 
