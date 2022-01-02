@@ -1,4 +1,4 @@
-CFLAGS = -std=c11 -g -pedantic -Werror -Wall -D_DEBUG -Wno-missing-braces
+CFLAGS = -std=c11 -g -Wpedantic -Werror -Wall -Wextra -D_DEBUG -Wno-missing-braces -Wno-format
 
 BINDIR = bin
 

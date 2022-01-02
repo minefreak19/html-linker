@@ -30,7 +30,7 @@ static void read_file_into_buffer(Cstr file_path, Buffer *buf)
         fclose(infile);
         exit(1);
     }
-    size_t len = ftell(infile);
+    int len = ftell(infile);
 
     if (len < 0) {
         fprintf(stderr, "ERROR: Could not obtain file size for %s: %s\n",

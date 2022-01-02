@@ -6,6 +6,7 @@ Created 28 December 2021
 #define UTIL_H_
 
 #include <stddef.h>
+#include <inttypes.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -16,10 +17,18 @@ extern "C"
 
 typedef const char *Cstr;
 
+#ifndef SIZE_T_MODIFIER
+# ifdef _WIN32
+#  define SIZE_T_MODIFIER "I"
+# else 
+#  define SIZE_T_MODIFIER "z"
+# endif // _WIN32
+#endif // !defined(SIZE_T_MODIFIER)
+
 # if defined(__GNUC__) || defined(__clang__)
 
 #  ifdef _WIN32
-#   define PRINTF_FORMAT(fmt_idx, chk_idx) __attribute__ ((formst (ms_printf, fmt_idx, chk_idx)))
+#   define PRINTF_FORMAT(fmt_idx, chk_idx) __attribute__ ((format (ms_printf, fmt_idx, chk_idx)))
 #  else
 #   define PRINTF_FORMAT(fmt_idx, chk_idx) __attribute__ ((format (printf, fmt_idx, chk_idx)))
 #  endif // _WIN32

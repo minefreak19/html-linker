@@ -23,7 +23,7 @@ void panic_debug(Cstr file, size_t line, Cstr func, Cstr message, ...)
     va_list vargs;
     va_start(vargs, message);
 
-    fprintf(stderr, "%s:%zu: In %s:\n", file, line, func);
+    fprintf(stderr, "%s:%"SIZE_T_MODIFIER"u: In %s:\n", file, line, func);
     vfprintf(stderr, message, vargs);
 
     exit(1);
@@ -43,7 +43,7 @@ void panic_impl(Cstr message, ...)
 void *notnull_debug(Cstr file, size_t line, Cstr func, Cstr var_name, void *ptr)
 {
     if (ptr == NULL) {
-        fprintf(stderr, "%s:%zu: In %s:\n", file, line, func);
+        fprintf(stderr, "%s:%"SIZE_T_MODIFIER"u: In %s:\n", file, line, func);
         fprintf(stderr, "ERROR: %s is a null pointer\n", var_name);
         exit(1);
     }
