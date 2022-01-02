@@ -48,11 +48,16 @@ static void read_file_into_buffer(Cstr file_path, Buffer *buf)
     }
 
     char *contents = NOTNULL(malloc((len) * sizeof(char)));
-    fread(contents, sizeof(char), len, infile);
-    if (ferror(infile)) {
-        fprintf(stderr, "ERROR: Could not read file %s: %s\n",
-            file_path, strerror(errno));
-
+    if (fread(contents, sizeof(char), len, infile) == 0) {
+        if (ferror(infile)) {
+            fprintf(stderr, "ERROR: Could not read file %s: %s\n",
+                file_path, strerror(errno));
+        } else if (feof(infile)) {
+            fprintf(stderr, "ERROR: Could not read file %s: %s\n",
+                    file_path, "Reached end of file");
+        } else {
+            assert(false && "Unreachable");
+        }
         fclose(infile);
         free(contents);
         exit(1);
