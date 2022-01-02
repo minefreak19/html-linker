@@ -1,4 +1,5 @@
-CFLAGS = -std=c11 -g -Wpedantic -Werror -Wall -Wextra -D_DEBUG -Wno-missing-braces -Wno-format
+# CFLAGS = -std=c11 -g -Wpedantic -Werror -Wall -Wextra -D_DEBUG -Wno-missing-braces -Wno-format
+CFLAGS = -std=c11 -O3
 
 BINDIR = bin
 
@@ -12,10 +13,10 @@ include_files = $(wildcard $(INCDIR)/*.h) $(wildcard $(INCDIR)/**/*.h)
 
 INCARGS = $(foreach incdir,$(INCDIRS),$(addprefix -I,$(incdir)))
 
-.PHONY: all run clean
+.PHONY: all clean
 
-run: all
-	./bin/htmll test/src/index.html -o test/out/index.html
+# run: all
+#	 ./bin/htmll test/src/index.html -o test/out/index.html
 
 all: $(BINDIR)/htmll $(include_files) # recompile if include files change
 

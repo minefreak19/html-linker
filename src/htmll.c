@@ -348,6 +348,8 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
     }
 }
 
+#ifdef _DEBUG
+
 static void print_html_link_tag(FILE *stream, HTML_Tag tag)
 {
     assert(tag.type == HTML_TAG_TYPE_LINK);
@@ -437,6 +439,12 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
 
     fprintf(stream, "}\n");
 }
+
+#else
+
+# define print_html_tag(...)
+
+#endif // _DEBUG
 
 typedef struct {
     const struct Arguments *args;
