@@ -439,6 +439,7 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
 }
 
 typedef struct {
+    const struct Arguments *args;
     Buffer *output;
     Buffer *after_body;
 } HTML_Linker;
@@ -447,23 +448,46 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
 {
     switch (tag.type) {
         case HTML_TAG_TYPE_SCRIPT: {
-            // TODOOOOOOOOOOOOOOOOOOOO: process_html_tag does not grab scripts from files
             if (tag.as.script.inlyne) {
                 buffer_append_str(linker->output, tag.text.data, tag.text.count);
             } else {
-                if (tag.as.script.deferred) {
-                    printf("appending `"SV_Fmt"` to linker->after_body\n", SV_Arg(tag.text));
-                    buffer_append_str(linker->after_body, tag.text.data, tag.text.count);
-                } else {
-                    buffer_append_str(linker->output, tag.text.data, tag.text.count);
+                assert(tag.as.script.src.data != NULL);
+
+                Buffer *buf = tag.as.script.deferred 
+                                ? linker->after_body
+                                : linker->output;
+
+                buffer_append_fmt (buf, "<!-- INLINED FROM `"SV_Fmt"` -->\n", SV_Arg(tag.as.script.src));
+                buffer_append_cstr(buf, "<script>");
+
+                {
+                    Buffer *file_path_buf = new_buffer(128);
+
+                    refactor_relative_path(tag.as.script.src,
+                                           sv_from_cstr(linker->args->input_file),
+                                           file_path_buf);
+
+                    char *file_path = NOTNULL(malloc((file_path_buf->size + 1) * sizeof(char)));
+                    memcpy(file_path, file_path_buf->data, file_path_buf->size);
+                    file_path[file_path_buf->size] = '\0';
+
+                    read_file_into_buffer(file_path, buf);
+
+                    free(file_path);
+                    buffer_clear(file_path_buf);
+                    buffer_free(file_path_buf);
                 }
+
+                buffer_append_cstr(buf, "</script>");
+
             }
         } break;
 
         case HTML_TAG_TYPE_END_SCRIPT: {
             if (tag.as.end_script.match.deferred) {
-                printf("appending `"SV_Fmt"` to linker->after_body\n", SV_Arg(tag.text));
                 buffer_append_str(linker->after_body, tag.text.data, tag.text.count);
+            } else {
+                buffer_append_str(linker->output, tag.text.data, tag.text.count);
             }
         } break;
 
@@ -500,6 +524,7 @@ void htmll(const struct Arguments *args)
     HTML_Linker *linker = &(HTML_Linker) {
         .output = output_buf,
         .after_body = new_buffer(0),
+        .args = args,
     };
     while ((success = parse_html_tag(&parser, &contents, &tag))) {
         if (success) {
