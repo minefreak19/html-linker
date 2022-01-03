@@ -13,10 +13,11 @@ void usage(FILE *stream, Cstr program_name)
 
 }
 
+#define streq(a, b) (strcmp(a, b) == 0)
 
 struct HTML_Linker_Args parse_html_linker_args(int *argc, Cstr *argv[])
 {
-    struct HTML_Linker_Args ret = {0};
+    struct HTML_Linker_Args ret = DEFAULT_HTML_LINKER_ARGS;
     ret.program_name = shift_arg(argc, argv);
 
     Cstr arg;
@@ -24,7 +25,7 @@ struct HTML_Linker_Args parse_html_linker_args(int *argc, Cstr *argv[])
     while (*argc > 0) {
         arg = shift_arg(argc, argv);
 
-        if (strcmp(arg, "-o") == 0) {
+        if (streq(arg, "-o")) {
             if (*argc == 0) {
                 usage(stderr, ret.program_name);
                 fprintf(stderr, "ERROR: `-o` without output file\n");
@@ -32,8 +33,9 @@ struct HTML_Linker_Args parse_html_linker_args(int *argc, Cstr *argv[])
             }
 
             ret.output_file = shift_arg(argc, argv);
-        } 
-        else {
+        } else if (streq(arg, "--no-mention-source")) {
+            ret.mention_source = false;
+        } else {
             ret.input_file = arg;
         }
     }

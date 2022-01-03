@@ -4,3 +4,5 @@
 # all binaries
 *.exe
 bin/
+
+build.sh

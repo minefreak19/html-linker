@@ -464,7 +464,8 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
             if (sv_eq_ignorecase(tag.as.link.rel, (String_View) SV_STATIC("stylesheet"))) {
                 // simplest way of checking for urls/etc is force all relative directories to be explicit
                 if (sv_starts_with(tag.as.link.href, (String_View) SV_STATIC("."))) {
-                    buffer_append_fmt(linker->output, "<!-- INLINED FROM `"SV_Fmt"` -->", SV_Arg(tag.as.link.href));
+                    if (linker->args->mention_source)
+                        buffer_append_fmt(linker->output, "<!-- INLINED FROM `"SV_Fmt"` -->", SV_Arg(tag.as.link.href));
                     buffer_append_cstr(linker->output, "<style>");
                     {
                         Buffer *file_path_buf = new_buffer(128);
@@ -500,7 +501,8 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
                                 ? linker->after_body
                                 : linker->output;
 
-                buffer_append_fmt (buf, "<!-- INLINED FROM `"SV_Fmt"` -->", SV_Arg(tag.as.script.src));
+                if (linker->args->mention_source)
+                    buffer_append_fmt (buf, "<!-- INLINED FROM `"SV_Fmt"` -->", SV_Arg(tag.as.script.src));
                 buffer_append_cstr(buf, "<script>");
 
                 {
