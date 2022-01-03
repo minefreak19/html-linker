@@ -26,7 +26,7 @@ struct HTML_Linker_Args {
 #define DEFAULT_HTML_LINKER_ARGS ((struct HTML_Linker_Args) {  \
     .program_name      = NULL,                                 \
     .input_file        = NULL,                                 \
-    .output_file       = NULL,                                 \
+    .output_file       = "./out.html",                         \
     .mention_source    = true,                                 \
     .ignore_whitespace = false,                                \
   })
