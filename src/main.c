@@ -37,6 +37,8 @@ struct HTML_Linker_Args parse_html_linker_args(int *argc, Cstr *argv[])
             ret.mention_source = false;
         } else if (streq(arg, "--ignore-whitespace")) {
             ret.ignore_whitespace = true;
+        } else if (streq(arg, "--include-comments")) {
+            ret.include_comments = true;
         } else {
             ret.input_file = arg;
         }

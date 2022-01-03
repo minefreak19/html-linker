@@ -261,12 +261,29 @@ static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *o
     }
 
     if (sv_starts_with(*source, (String_View) SV_STATIC("<!--"))) {
-        // TODO: Add `include-comments` option to include comments in output
-        sv_chop_by_sv_left(source, SV("-->"));
+        String_View comment = sv_chop_by_sv_left(source, SV("-->"));
+
+        if (linker->args->include_comments) {
+            comment.data  -= (sizeof("<!--") - 1);
+            comment.count += (sizeof("<!--") - 1);
+            comment.count += (sizeof("-->")  - 1);
+
+            if (out) *out = (HTML_Tag) {
+                .name = SV("__comment__"),
+                .text = comment,
+                .type = HTML_TAG_TYPE_CONTENT,
+                .as   = {0},
+            };
+
+            return true;
+        }
+
         if (sv_trim(*source).count == 0) {
             // EOF
             return false;
         }
+
+        return parse_html_tag(linker, source, out);
     }
 
     if (!(sv_starts_with(*source, (String_View) SV_STATIC("<")))) {

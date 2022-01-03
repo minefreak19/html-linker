@@ -21,6 +21,7 @@ struct HTML_Linker_Args {
     Cstr output_file;
     bool mention_source;
     bool ignore_whitespace;
+    bool include_comments;
 };
 
 #define DEFAULT_HTML_LINKER_ARGS ((struct HTML_Linker_Args) {  \
@@ -29,7 +30,8 @@ struct HTML_Linker_Args {
     .output_file       = "./out.html",                         \
     .mention_source    = true,                                 \
     .ignore_whitespace = false,                                \
-  })
+    .include_comments  = false,                                \
+})
 
 void htmll(const struct HTML_Linker_Args *);
 
