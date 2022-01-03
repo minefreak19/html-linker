@@ -523,14 +523,13 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
                     buffer_free(file_path_buf);
                 }
 
-                buffer_append_cstr(buf, "</script>");
-
             }
         } break;
 
         case HTML_TAG_TYPE_END_SCRIPT: {
             if (tag.as.end_script.match.deferred) {
-                buffer_append_str(linker->after_body, tag.text.data, tag.text.count);
+                if (!tag.as.end_script.match.closed)
+                    buffer_append_str(linker->after_body, tag.text.data, tag.text.count);
             } else {
                 buffer_append_str(linker->output, tag.text.data, tag.text.count);
             }
