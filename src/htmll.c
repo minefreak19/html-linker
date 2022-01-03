@@ -147,6 +147,13 @@ typedef struct {
     size_t scripts_stack_sz;
 } Parser;
 
+typedef struct {
+    const struct HTML_Linker_Args *args;
+    Buffer *output;
+    Buffer *after_body;
+    Parser *parser;
+} HTML_Linker;
+
 static void parse_html_link_tag(Parser *parser, String_View *source, HTML_Tag *out)
 {
     (void) parser;
@@ -234,11 +241,14 @@ static void parse_html_script_tag(Parser *parser, String_View *source, HTML_Tag 
     if (out) *out = result;
 }
 
-static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
+static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *out)
 {
-    *source = sv_trim_left(*source);
+    Parser *parser = linker->parser;
+    if (linker->args->ignore_whitespace) {
+        *source = sv_trim_left(*source);
+    }
     
-    if (source->count == 0) return false;
+    if (sv_trim(*source).count == 0) return false;
 
     if (sv_starts_with(*source, (String_View) SV_STATIC("<!DOCTYPE"))) {
         sv_chop_by_delim(source, '>');
@@ -247,20 +257,35 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
             exit(1);
         }
 
-        return parse_html_tag(parser, source, out);
+        return parse_html_tag(linker, source, out);
     }
 
     if (sv_starts_with(*source, (String_View) SV_STATIC("<!--"))) {
+        // TODO: Add `include-comments` option to include comments in output
         sv_chop_by_sv_left(source, SV("-->"));
         if (sv_trim(*source).count == 0) {
+            // EOF
             return false;
         }
     }
 
     if (!(sv_starts_with(*source, (String_View) SV_STATIC("<")))) {
         if (!(parser->in_script)) {
-            // TODO: Add `ignore-whitespace` option to ignore content that is all whitespace
+            String_View leading_spaces = sv_chop_left_while(source, (void *)isspace);
             String_View content = sv_chop_by_delim(source, '<');
+
+            source->data--;
+            source->count++;
+            
+            if (linker->args->ignore_whitespace) {
+                content = sv_trim(content);
+                if (content.count == 0) {
+                    return parse_html_tag(linker, source, out);
+                }
+            } else {
+                content.data  -= leading_spaces.count;
+                content.count += leading_spaces.count;
+            }
         
             HTML_Tag result = {
                 .name = SV_STATIC("__content__"),
@@ -270,9 +295,6 @@ static bool parse_html_tag(Parser *parser, String_View *source, HTML_Tag *out)
             };
 
             if (out) *out = result;
-
-            source->data--;
-            source->count++;
 
             return true;
         } else {
@@ -451,12 +473,6 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
 
 #endif // _DEBUG
 
-typedef struct {
-    const struct HTML_Linker_Args *args;
-    Buffer *output;
-    Buffer *after_body;
-} HTML_Linker;
-
 static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
 {
     switch (tag.type) {
@@ -565,15 +581,16 @@ void htmll(const struct HTML_Linker_Args *args)
         .scripts_stack = {0},
         .scripts_stack_sz = 0,
     };
-    HTML_Linker *linker = &(HTML_Linker) {
+    HTML_Linker linker = {
         .output = output_buf,
         .after_body = new_buffer(0),
         .args = args,
+        .parser = &parser,
     };
-    while ((success = parse_html_tag(&parser, &contents, &tag))) {
+    while ((success = parse_html_tag(&linker, &contents, &tag))) {
         if (success) {
             print_html_tag(stdout, tag);
-            process_html_tag(linker, tag);
+            process_html_tag(&linker, tag);
         }
     }
 
@@ -592,8 +609,8 @@ void htmll(const struct HTML_Linker_Args *args)
 
     fclose(outfile);
 
-    buffer_clear(linker->after_body);
-    buffer_free(linker->after_body);
+    buffer_clear(linker.after_body);
+    buffer_free(linker.after_body);
 
     buffer_clear(output_buf);
     buffer_free(output_buf);

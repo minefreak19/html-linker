@@ -1,4 +1,4 @@
-# CFLAGS = -std=c11 -g -Wpedantic -Werror -Wall -Wextra -D_DEBUG -Wno-missing-braces -Wno-format
+# CFLAGS = -std=c11 -g -Werror -Wall -Wextra -D_DEBUG -Wno-missing-braces -Wno-format
 CFLAGS = -std=c11 -O3
 
 BINDIR = bin

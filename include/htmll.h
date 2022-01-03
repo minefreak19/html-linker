@@ -20,9 +20,16 @@ struct HTML_Linker_Args {
     Cstr input_file;
     Cstr output_file;
     bool mention_source;
+    bool ignore_whitespace;
 };
 
-#define DEFAULT_HTML_LINKER_ARGS ((struct HTML_Linker_Args) { NULL, NULL, NULL, true })
+#define DEFAULT_HTML_LINKER_ARGS ((struct HTML_Linker_Args) {  \
+    .program_name      = NULL,                                 \
+    .input_file        = NULL,                                 \
+    .output_file       = NULL,                                 \
+    .mention_source    = true,                                 \
+    .ignore_whitespace = false,                                \
+  })
 
 void htmll(const struct HTML_Linker_Args *);
 
