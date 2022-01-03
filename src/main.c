@@ -10,7 +10,11 @@ void usage(FILE *stream, Cstr program_name)
 {
     fprintf(stream, "USAGE: %s [options...] <input_file> -o <output_file>\n",
         program_name);
-
+    fprintf(stream,
+        "OPTIONS: \n"
+        "   --no-mention-source     Remove comments that mention when something was inlined.\n"
+        "   --ignore-whitespace     Ignore whitespace in HTML content.\n"
+        "   --include-comments      Include HTML comments in output.\n");
 }
 
 #define streq(a, b) (strcmp(a, b) == 0)
