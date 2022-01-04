@@ -15,7 +15,8 @@ void usage(FILE *stream, Cstr program_name)
         "OPTIONS: \n"
         "   --no-mention-source     Remove comments that mention when something was inlined.\n"
         "   --ignore-whitespace     Ignore whitespace in HTML content.\n"
-        "   --include-comments      Include HTML comments in output.\n");
+        "   --include-comments      Include HTML comments in output.\n"
+        "   --watch, -w             Watch files, and re-link on file changes.\n");
 }
 
 #define streq(a, b) (strcmp(a, b) == 0)
