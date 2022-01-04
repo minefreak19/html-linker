@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "system_util.h"
 #include "util.h"
 #include "htmll.h"
 
@@ -43,6 +44,8 @@ struct HTML_Linker_Args parse_html_linker_args(int *argc, Cstr *argv[])
             ret.ignore_whitespace = true;
         } else if (streq(arg, "--include-comments")) {
             ret.include_comments = true;
+        } else if (streq(arg, "--watch") || streq(arg, "-w")) {
+            ret.watch_mode = true;
         } else {
             ret.input_file = arg;
         }
