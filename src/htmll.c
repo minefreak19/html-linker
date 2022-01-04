@@ -621,8 +621,16 @@ void htmll(const struct HTML_Linker_Args *args)
         exit(1);
     }
 
-    fprintf(outfile, "%s\n", "<!DOCTYPE html>");
-    fprintf(outfile, "%.*s", (int) output_buf->size, output_buf->data);
+    if (fprintf(outfile, "%s\n", "<!DOCTYPE html>") < 0) {
+        fprintf(stderr, "ERROR: Could not write to file %s: %s\n",
+                args->output_file, strerror(errno));
+        exit(1);
+    }
+    if (fprintf(outfile, "%.*s", (int) output_buf->size, output_buf->data) < 0) {
+        fprintf(stderr, "ERROR: Could not write to file %s: %s\n",
+                args->output_file, strerror(errno));
+        exit(1);
+    }
 
     fclose(outfile);
 
