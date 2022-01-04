@@ -28,6 +28,8 @@ filetime_t get_file_modified_time(const char *file_path)
     value.HighPart = result.dwHighDateTime;
     value.LowPart = result.dwLowDateTime;
 
+    CloseHandle(hFile);
+
     return value.QuadPart;
 
 #elif defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
