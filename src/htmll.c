@@ -640,3 +640,5 @@ void htmll(const struct HTML_Linker_Args *args)
     buffer_clear(output_buf);
     buffer_free(output_buf);
 }
+
+// TODO: keep track of what files have been included already, and prompt on duplicate includes
