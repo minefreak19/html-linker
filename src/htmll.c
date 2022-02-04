@@ -221,7 +221,7 @@ static void parse_html_script_tag(Parser *parser, String_View *source, HTML_Tag 
                 result.as.script.deferred = true;
             } else if (sv_eq(attr_name, (String_View) SV_STATIC("type"))) {
                 if (!(sv_eq_ignorecase(attr_value, SV("text/javascript")))) {
-                    // TODO: non-supported script types should be treated as regular HTML and copied across
+                    // TODO(#1): non-supported script types should be treated as regular HTML and copied across
                     fprintf(stderr, "ERROR: script type `"SV_Fmt"` is not supported.\n",
                             SV_Arg(attr_value));
                     exit(1);
