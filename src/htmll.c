@@ -648,7 +648,6 @@ void htmll(const struct HTML_Linker_Args *args)
     if (args->watch_mode) {
         printf("[INFO] Starting in watch mode...\n");
         while (true) {
-            // TODOOOOOOOOOOOOOOOOOOOOOOOOOO: SIGINT is currently ignored on windows
             sys_sleep(5);
             printf("[INFO] Checking for file changes...\n");
             filetime_t out_time = get_file_modified_time(args->output_file);

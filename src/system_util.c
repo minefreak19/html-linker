@@ -46,7 +46,7 @@ filetime_t get_file_modified_time(const char *file_path)
 void sys_sleep(int seconds)
 {
 #ifdef _WIN32
-    Sleep(seconds * 1000);
+    SleepEx(seconds * 1000, TRUE);
 #elif defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
     if (sleep(seconds) > 0) {
         fprintf(stderr, "ERROR: Could not sleep: %s\n", 
