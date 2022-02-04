@@ -642,6 +642,9 @@ static void html_link(const struct HTML_Linker_Args *args)
     buffer_free(output_buf);
 }
 
+// TODO: keep track of included files and remove duplicate includes 
+//  (make opt-in with flag though)
+
 void htmll(const struct HTML_Linker_Args *args)
 {
     html_link(args);
