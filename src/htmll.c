@@ -316,7 +316,7 @@ static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *o
 
             return true;
         } else {
-            // TODO: inlined javascript should be handled properly 
+            // TODO(#2): inlined javascript should be handled properly 
             //  current implementation gets triggered by `</script>`
             //  in string literals, comments, etc
             const String_View end_script_tag = SV_STATIC("</script>");
@@ -642,7 +642,7 @@ static void html_link(const struct HTML_Linker_Args *args)
     buffer_free(output_buf);
 }
 
-// TODO: keep track of included files and remove duplicate includes 
+// TODO(#3): keep track of included files and remove duplicate includes 
 //  (make opt-in with flag though)
 
 void htmll(const struct HTML_Linker_Args *args)
