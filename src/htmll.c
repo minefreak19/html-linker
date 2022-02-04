@@ -11,6 +11,7 @@
 #define SV_IMPLEMENTATION
 #include <sv.h>
 
+#include "system_util.h"
 #include "util.h"
 #include "tmp_buf.h"
 
@@ -579,7 +580,7 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
     }
 }
 
-void htmll(const struct HTML_Linker_Args *args)
+static void html_link(const struct HTML_Linker_Args *args)
 {
     Buffer *input_buf = new_buffer(0);
     Buffer *output_buf = new_buffer(0);
@@ -641,4 +642,21 @@ void htmll(const struct HTML_Linker_Args *args)
     buffer_free(output_buf);
 }
 
-// TODO: keep track of what files have been included already, and prompt on duplicate includes
+void htmll(const struct HTML_Linker_Args *args)
+{
+    html_link(args);
+    if (args->watch_mode) {
+        printf("[INFO] Starting in watch mode...\n");
+        while (true) {
+            sys_sleep(5);
+            printf("[INFO] Checking for file changes...\n");
+            filetime_t out_time = get_file_modified_time(args->output_file);
+            filetime_t in_time = get_file_modified_time(args->input_file);
+
+            if (in_time > out_time) {
+                printf("[INFO] File changes detected. Re-linking...\n");
+                html_link(args);
+            }
+        }
+    }
+}

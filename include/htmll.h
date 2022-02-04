@@ -22,6 +22,7 @@ struct HTML_Linker_Args {
     bool mention_source;
     bool ignore_whitespace;
     bool include_comments;
+    bool watch_mode;
 };
 
 #define DEFAULT_HTML_LINKER_ARGS ((struct HTML_Linker_Args) {  \
@@ -31,6 +32,7 @@ struct HTML_Linker_Args {
     .mention_source    = true,                                 \
     .ignore_whitespace = false,                                \
     .include_comments  = false,                                \
+    .watch_mode        = false,                                \
 })
 
 void htmll(const struct HTML_Linker_Args *);

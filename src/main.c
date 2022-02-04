@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "system_util.h"
 #include "util.h"
 #include "htmll.h"
 
@@ -14,7 +15,8 @@ void usage(FILE *stream, Cstr program_name)
         "OPTIONS: \n"
         "   --no-mention-source     Remove comments that mention when something was inlined.\n"
         "   --ignore-whitespace     Ignore whitespace in HTML content.\n"
-        "   --include-comments      Include HTML comments in output.\n");
+        "   --include-comments      Include HTML comments in output.\n"
+        "   --watch, -w             Watch files, and re-link on file changes.\n");
 }
 
 #define streq(a, b) (strcmp(a, b) == 0)
@@ -43,6 +45,8 @@ struct HTML_Linker_Args parse_html_linker_args(int *argc, Cstr *argv[])
             ret.ignore_whitespace = true;
         } else if (streq(arg, "--include-comments")) {
             ret.include_comments = true;
+        } else if (streq(arg, "--watch") || streq(arg, "-w")) {
+            ret.watch_mode = true;
         } else {
             ret.input_file = arg;
         }
