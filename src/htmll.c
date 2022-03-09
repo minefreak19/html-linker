@@ -492,7 +492,7 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
 #endif // _DEBUG
 
 // TODO(#4): No properly located or otherwise well-structured error reporting
-// TODOOOO: Code duplication in process_html_tag
+// TODOOOO(#5): Code duplication in process_html_tag
 static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
 {
     switch (tag.type) {
