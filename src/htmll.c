@@ -106,9 +106,9 @@ const char *const HTML_TAG_TYPE_NAMES[COUNT_HTML_TAG_TYPES] = {
 
     [HTML_TAG_TYPE_END_BODY]   = "END BODY",
     [HTML_TAG_TYPE_END_SCRIPT] = "END SCRIPT",
-    
+
     [HTML_TAG_TYPE_CONTENT]    = "CONTENT",
-    
+
     [HTML_TAG_TYPE_OTHER]      = "OTHER",
 };
 
@@ -248,7 +248,7 @@ static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *o
     if (linker->args->ignore_whitespace) {
         *source = sv_trim_left(*source);
     }
-    
+
     if (sv_trim(*source).count == 0) return false;
 
     if (sv_starts_with(*source, (String_View) SV_STATIC("<!DOCTYPE"))) {
@@ -294,7 +294,7 @@ static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *o
 
             source->data--;
             source->count++;
-            
+
             if (linker->args->ignore_whitespace) {
                 content = sv_trim(content);
                 if (content.count == 0) {
@@ -304,7 +304,7 @@ static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *o
                 content.data  -= leading_spaces.count;
                 content.count += leading_spaces.count;
             }
-        
+
             HTML_Tag result = {
                 .name = SV_STATIC("__content__"),
                 .type = HTML_TAG_TYPE_CONTENT,
@@ -316,7 +316,7 @@ static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *o
 
             return true;
         } else {
-            // TODO(#2): inlined javascript should be handled properly 
+            // TODO(#2): inlined javascript should be handled properly
             //  current implementation gets triggered by `</script>`
             //  in string literals, comments, etc
             const String_View end_script_tag = SV_STATIC("</script>");
@@ -344,7 +344,7 @@ static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *o
     {
         sv_chop_left(source, 1);
         String_View tag = sv_trim(sv_chop_by_delim(source, '>'));
-        
+
         if (tag.count == 0) {
             fprintf(stderr, "ERROR: Empty HTML tag\n");
         }
@@ -352,7 +352,7 @@ static bool parse_html_tag(HTML_Linker *linker, String_View *source, HTML_Tag *o
         String_View tag_text = tag;
         tag_text.data  -= 1;
         tag_text.count += 2;
-       
+
         HTML_Tag result;
 
         String_View name = sv_trim(sv_chop_by_delim(&tag, ' '));
@@ -430,7 +430,7 @@ static void print_html_script_tag(FILE *stream, HTML_Tag tag)
                 BOOL_TO_STR(tag.as.script.closed),
                 BOOL_TO_STR(tag.as.script.deferred));
         if (!tag.as.script.closed)
-            fprintf(stream, 
+            fprintf(stream,
                         "           text = `"SV_Fmt"`,\n",
                         SV_Arg(tag.text));
         fprintf(stream, "       }\n");
@@ -465,7 +465,7 @@ static void print_html_tag(FILE *stream, HTML_Tag tag)
         case HTML_TAG_TYPE_LINK: {
             print_html_link_tag(stream, tag);
         } break;
-        
+
         case HTML_TAG_TYPE_SCRIPT: {
             print_html_script_tag(stream, tag);
         } break;
@@ -519,6 +519,9 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
                         buffer_free(file_path_buf);
                     }
                     buffer_append_cstr(linker->output, "</style>");
+                } else {
+                    printf("NOTE: Paths must be explicitly relative (ie start with `.`). Including a tag linking to `"SV_Fmt"` in output file...\n", SV_Arg(tag.as.link.href));
+                    buffer_append_str(linker->output, tag.text.data, tag.text.count);
                 }
             } else {
                 buffer_append_str(linker->output, tag.text.data, tag.text.count);
@@ -531,7 +534,7 @@ static void process_html_tag(HTML_Linker *linker, HTML_Tag tag)
             } else {
                 assert(tag.as.script.src.data != NULL);
 
-                Buffer *buf = tag.as.script.deferred 
+                Buffer *buf = tag.as.script.deferred
                                 ? linker->after_body
                                 : linker->output;
 
@@ -617,7 +620,7 @@ static void html_link(const struct HTML_Linker_Args *args)
 
     FILE *outfile = fopen(args->output_file, "wb");
     if (outfile == NULL) {
-        fprintf(stderr, "ERROR: Could not open file %s: %s\n", 
+        fprintf(stderr, "ERROR: Could not open file %s: %s\n",
                 args->output_file, strerror(errno));
         exit(1);
     }
@@ -642,7 +645,7 @@ static void html_link(const struct HTML_Linker_Args *args)
     buffer_free(output_buf);
 }
 
-// TODO(#3): keep track of included files and remove duplicate includes 
+// TODO(#3): keep track of included files and remove duplicate includes
 //  (make opt-in with flag though)
 
 void htmll(const struct HTML_Linker_Args *args)
